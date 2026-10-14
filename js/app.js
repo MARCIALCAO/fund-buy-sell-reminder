@@ -402,7 +402,7 @@
       totalMarketValue += item.marketValue; // 按正式 NAV 计算的市值
       totalCost += item.totalCost;
       const fund = currentFunds.find(f => f.id === item.fundId);
-      if (fund) totalPlannedBudget += (fund.plannedAmount || 0);
+      if (fund) totalPlannedBudget += (fund.plannedAmount !== undefined && fund.plannedAmount !== null && !isNaN(Number(fund.plannedAmount))) ? Number(fund.plannedAmount) : 0;
       totalTodayEstimatedProfit += item.todayEstimatedProfit;
       const itemGz = item.gzTime || (item.navDate ? `${item.navDate} 15:00` : '');
       if (itemGz && itemGz > latestRawGzTime) {
@@ -1608,7 +1608,7 @@
     elements.inputProfitRate.value = profitRate.toFixed(2);
     lastProfitField = 'amount';
 
-    elements.inputPlannedAmount.value = fund.plannedAmount || 15000;
+    elements.inputPlannedAmount.value = (fund.plannedAmount !== undefined && fund.plannedAmount !== null && fund.plannedAmount !== '') ? fund.plannedAmount : 15000;
 
     const buyMode = fund.buyAnchorMode || fund.anchorMode || 'initialCost';
     elements.selectBuyAnchorMode.value = buyMode;
@@ -2282,7 +2282,7 @@
 
     elements.configFundId.value = fundId;
     elements.cfgStepPercent.value = fund.stepPercent || 5.0;
-    elements.cfgPlannedAmount.value = fund.plannedAmount || 10000;
+    elements.cfgPlannedAmount.value = (fund.plannedAmount !== undefined && fund.plannedAmount !== null && fund.plannedAmount !== '') ? fund.plannedAmount : 10000;
 
     const buyMode = fund.buyAnchorMode || fund.anchorMode || 'initialCost';
     elements.cfgBuyAnchorMode.value = buyMode;
@@ -2321,7 +2321,7 @@
         <div style="font-size: 12px; font-weight: 700; min-width: 52px;">第 ${index + 1} 档</div>
         <div style="font-size: 11px; color: var(--text-muted); min-width: 96px;">跌 -${triggerPct}% / 涨 +${triggerPct}%</div>
         <div style="display: flex; align-items: center; gap: 4px; flex: 1;">
-          <input type="number" min="1" max="100" class="form-input tier-ratio-input" data-index="${index}" value="${ratio}" style="padding: 4px 8px; font-size: 13px; text-align: right; height: 32px;">
+          <input type="number" step="any" min="0" max="100" class="form-input tier-ratio-input" data-index="${index}" value="${ratio}" style="padding: 4px 8px; font-size: 13px; text-align: right; height: 32px;">
           <span style="font-size: 12px; color: var(--text-muted)">%</span>
         </div>
         ${currentEditingTiers.length > 1 ? `<button type="button" class="btn btn-sm btn-icon-only btn-remove-tier" data-index="${index}" style="width: 30px; height: 30px; color: var(--text-muted); border: none; background: transparent;" title="删除此档">✕</button>` : '<div style="width: 30px;"></div>'}
@@ -2450,7 +2450,8 @@
     }
 
     const step = parseFloat(elements.cfgStepPercent.value) || 5.0;
-    const planned = parseFloat(elements.cfgPlannedAmount.value) || 10000;
+    const plannedVal = elements.cfgPlannedAmount.value.trim();
+    const planned = (plannedVal !== '' && !isNaN(Number(plannedVal))) ? Math.max(0, parseFloat(plannedVal)) : 10000;
     const buyAnchorMode = elements.cfgBuyAnchorMode.value;
     const buyBenchmarkPrice = parseFloat(elements.cfgBuyBenchmarkPrice.value) || fund.initialCost;
     const sellAnchorMode = elements.cfgSellAnchorMode.value;

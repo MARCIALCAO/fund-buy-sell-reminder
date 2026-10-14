@@ -12,7 +12,7 @@
   <title>基金金字塔买卖助手 | Pyramid Fund Master</title>
   
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/style.css?v=2.10">
+  <link rel="stylesheet" href="css/style.css?v=2.11">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
 </head>
 <body>
@@ -202,7 +202,7 @@
           <label class="form-label" for="inputPlannedAmount">
             <span>该基金计划总预算 (元)</span>
           </label>
-          <input type="number" step="100" id="inputPlannedAmount" class="form-input" placeholder="例如：20000" value="15000" required>
+          <input type="number" step="any" min="0" id="inputPlannedAmount" class="form-input" placeholder="例如：20000 或 0" value="15000" required>
         </div>
 
         <div class="form-group">
@@ -219,7 +219,7 @@
             </select>
             <div style="position: relative; flex: 1; min-width: 100px;">
               <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; pointer-events: none;">¥</span>
-              <input type="number" step="0.0001" id="inputBuyBenchmarkPrice" class="form-input tabular-nums" placeholder="买基准价" style="padding-left: 24px; width: 100%;" title="买入基准价数值">
+              <input type="number" step="any" min="0" id="inputBuyBenchmarkPrice" class="form-input tabular-nums" placeholder="买基准价" style="padding-left: 24px; width: 100%;" title="买入基准价数值">
             </div>
           </div>
         </div>
@@ -238,7 +238,7 @@
             </select>
             <div style="position: relative; flex: 1; min-width: 100px;">
               <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; pointer-events: none;">¥</span>
-              <input type="number" step="0.0001" id="inputSellBenchmarkPrice" class="form-input tabular-nums" placeholder="卖基准价" style="padding-left: 24px; width: 100%;" title="卖出基准价数值">
+              <input type="number" step="any" min="0" id="inputSellBenchmarkPrice" class="form-input tabular-nums" placeholder="卖基准价" style="padding-left: 24px; width: 100%;" title="卖出基准价数值">
             </div>
           </div>
         </div>
@@ -295,7 +295,7 @@
               <span>成交/参考净值</span>
               <span id="tradePriceStatusBadge" class="form-tip" style="color: #3b82f6;">(盘中预估)</span>
             </label>
-            <input type="number" step="0.0001" id="tradePrice" class="form-input tabular-nums" placeholder="输入净值" required>
+            <input type="number" step="any" min="0" id="tradePrice" class="form-input tabular-nums" placeholder="输入净值" required>
           </div>
         </div>
 
@@ -310,7 +310,7 @@
           <label class="form-label" for="tradeBuyAmount">
             <span>申购/加仓金额 (元)</span>
           </label>
-          <input type="number" step="0.01" id="tradeBuyAmount" class="form-input" placeholder="例如：2000">
+          <input type="number" step="any" min="0" id="tradeBuyAmount" class="form-input" placeholder="例如：2000">
         </div>
 
         <div id="tradeSellSection" class="form-group" style="display: none;">
@@ -318,7 +318,7 @@
             <span>赎回/减仓份额 (份)</span>
             <span id="maxSellSharesTip" class="form-tip">当前持有: 0 份</span>
           </label>
-          <input type="number" step="0.01" id="tradeSellShares" class="form-input" placeholder="例如：1000">
+          <input type="number" step="any" min="0" id="tradeSellShares" class="form-input" placeholder="例如：1000">
         </div>
 
         <div class="form-group">
@@ -367,7 +367,7 @@
             <label class="form-label" for="editTradePrice">
               <span>成交/确认净值 (元)</span>
             </label>
-            <input type="number" step="0.0001" id="editTradePrice" class="form-input tabular-nums" placeholder="例如：1.2500" required>
+            <input type="number" step="any" min="0" id="editTradePrice" class="form-input tabular-nums" placeholder="例如：1.2500" required>
           </div>
         </div>
 
@@ -376,13 +376,13 @@
             <label class="form-label" for="editTradeAmount">
               <span id="editTradeAmountLabel">加减仓金额 (元)</span>
             </label>
-            <input type="number" step="0.01" id="editTradeAmount" class="form-input tabular-nums" placeholder="例如：2000.00" required>
+            <input type="number" step="any" min="0" id="editTradeAmount" class="form-input tabular-nums" placeholder="例如：2000.00" required>
           </div>
           <div class="form-group">
             <label class="form-label" for="editTradeShares">
               <span id="editTradeSharesLabel">确认份额 (份)</span>
             </label>
-            <input type="number" step="0.01" id="editTradeShares" class="form-input tabular-nums" placeholder="例如：1600.00" required>
+            <input type="number" step="any" min="0" id="editTradeShares" class="form-input tabular-nums" placeholder="例如：1600.00" required>
           </div>
         </div>
 
@@ -421,11 +421,11 @@
               <span>价格触发步长 (%)</span>
               <span class="form-tip">何时触发买卖</span>
             </label>
-            <input type="number" step="0.5" id="cfgStepPercent" class="form-input" value="5.0" required>
+            <input type="number" step="any" min="0.1" id="cfgStepPercent" class="form-input" value="5.0" required>
           </div>
           <div class="form-group">
             <label class="form-label" for="cfgPlannedAmount">计划总预算 (元)</label>
-            <input type="number" step="100" id="cfgPlannedAmount" class="form-input" required>
+            <input type="number" step="any" min="0" id="cfgPlannedAmount" class="form-input" placeholder="例如：10000 或 0" required>
           </div>
         </div>
 
@@ -443,7 +443,7 @@
             </select>
             <div style="position: relative; flex: 1; min-width: 100px;">
               <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; pointer-events: none;">¥</span>
-              <input type="number" step="0.0001" id="cfgBuyBenchmarkPrice" class="form-input tabular-nums" placeholder="买基准价" style="padding-left: 24px; width: 100%;" title="买入基准价格">
+              <input type="number" step="any" min="0" id="cfgBuyBenchmarkPrice" class="form-input tabular-nums" placeholder="买基准价" style="padding-left: 24px; width: 100%;" title="买入基准价格">
             </div>
           </div>
         </div>
@@ -462,7 +462,7 @@
             </select>
             <div style="position: relative; flex: 1; min-width: 100px;">
               <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px; pointer-events: none;">¥</span>
-              <input type="number" step="0.0001" id="cfgSellBenchmarkPrice" class="form-input tabular-nums" placeholder="卖基准价" style="padding-left: 24px; width: 100%;" title="卖出基准价格">
+              <input type="number" step="any" min="0" id="cfgSellBenchmarkPrice" class="form-input tabular-nums" placeholder="卖基准价" style="padding-left: 24px; width: 100%;" title="卖出基准价格">
             </div>
           </div>
         </div>
@@ -597,10 +597,10 @@
   </div>
 
   <!-- 引入核心 JS 模块 -->
-  <script src="js/api.js?v=2.10"></script>
-  <script src="js/strategy.js?v=2.10"></script>
-  <script src="js/storage.js?v=2.10"></script>
-  <script src="js/notification.js?v=2.10"></script>
-  <script src="js/app.js?v=2.10"></script>
+  <script src="js/api.js?v=2.11"></script>
+  <script src="js/strategy.js?v=2.11"></script>
+  <script src="js/storage.js?v=2.11"></script>
+  <script src="js/notification.js?v=2.11"></script>
+  <script src="js/app.js?v=2.11"></script>
 </body>
 </html>

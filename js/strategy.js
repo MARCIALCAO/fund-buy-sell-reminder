@@ -86,7 +86,7 @@ const FundStrategy = {
       avgCost: unitCost, // 持仓均价
       initialCost: unitCost, // 初始建仓成本价（默认锚点）
       lastTradePrice: unitCost, // 最新交易价
-      plannedAmount: parseFloat(input.plannedAmount) || this.DEFAULT_CONFIG.plannedAmount,
+      plannedAmount: (input.plannedAmount !== undefined && input.plannedAmount !== null && String(input.plannedAmount).trim() !== '' && !isNaN(Number(input.plannedAmount))) ? Math.max(0, parseFloat(input.plannedAmount)) : this.DEFAULT_CONFIG.plannedAmount,
       buyAnchorMode: buyAnchorMode,
       buyBenchmarkPrice: buyBenchmarkPrice,
       sellAnchorMode: sellAnchorMode,
@@ -190,9 +190,10 @@ const FundStrategy = {
     const buyDeviation = ((currentPrice - buyBasePrice) / buyBasePrice) * 100;
     const sellDeviation = ((currentPrice - sellBasePrice) / sellBasePrice) * 100;
 
-    // 计算各阶梯买入点（金字塔：基于 buyBasePrice 越跌越买）与卖出点（倒金字塔：基于 sellBasePrice 越涨越卖）
     const tiers = (fund.tiers && fund.tiers.length > 0) ? fund.tiers : this.DEFAULT_CONFIG.tiers;
-    const plannedAmount = fund.plannedAmount || this.DEFAULT_CONFIG.plannedAmount;
+    const plannedAmount = (fund.plannedAmount !== undefined && fund.plannedAmount !== null && fund.plannedAmount !== '' && !isNaN(Number(fund.plannedAmount))) 
+      ? Math.max(0, Number(fund.plannedAmount)) 
+      : this.DEFAULT_CONFIG.plannedAmount;
 
     const buyLadders = [];
     const sellLadders = [];
