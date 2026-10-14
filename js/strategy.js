@@ -467,6 +467,90 @@ const FundStrategy = {
       if (fund.sellAnchorMode === 'lastTrade') fund.sellBenchmarkPrice = officialNav;
     }
 
+    return this.recalculateFundPositions(fund);
+  },
+
+  /**
+   * 重算基金持仓数据（基于所有交易明细重新推演份额与加权平均成本）
+   * 用于加减仓记录修改、删除或校准后，保证持仓与交易记录 100% 严谨一致
+   * @param {Object} fund 基金对象
+   */
+  recalculateFundPositions(fund) {
+    if (!fund || !Array.isArray(fund.trades)) return fund;
+
+    // 寻找初始建仓记录
+    let initTrade = fund.trades.find(t => t.type === 'init');
+    let totalShares = 0;
+    let totalCost = 0;
+    let initialCost = parseFloat(fund.initialCost) || 1.0;
+
+    if (initTrade) {
+      totalShares = parseFloat(initTrade.shares) || 0;
+      totalCost = parseFloat(initTrade.amount) || 0;
+      initialCost = parseFloat(initTrade.price) || (totalShares > 0 ? totalCost / totalShares : initialCost);
+    } else {
+      totalShares = parseFloat(fund.shares) || 0;
+      totalCost = parseFloat(fund.totalCost) || 0;
+      initialCost = parseFloat(fund.initialCost) || (totalShares > 0 ? totalCost / totalShares : 1.0);
+      initTrade = {
+        id: 'trade_init_' + Date.now(),
+        type: 'init',
+        date: fund.createdAt ? fund.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+        amount: totalCost,
+        shares: totalShares,
+        price: initialCost,
+        remark: '初始建仓/录入',
+        timestamp: fund.createdAt ? new Date(fund.createdAt).getTime() : 1
+      };
+      fund.trades.unshift(initTrade);
+    }
+
+    fund.initialCost = initialCost;
+    let runningShares = totalShares;
+    let runningCost = totalCost;
+    let runningAvgCost = runningShares > 0 ? runningCost / runningShares : initialCost;
+    let lastPrice = initialCost;
+
+    // 提取所有有效的加仓与减仓记录，按时间升序重演
+    const actionTrades = fund.trades.filter(t => t.type === 'buy' || t.type === 'sell');
+    actionTrades.sort((a, b) => {
+      const tA = a.timestamp || (a.date ? new Date(a.date).getTime() : 0);
+      const tB = b.timestamp || (b.date ? new Date(b.date).getTime() : 0);
+      return tA - tB;
+    });
+
+    for (const trade of actionTrades) {
+      const price = parseFloat(trade.price) || runningAvgCost;
+      lastPrice = price;
+
+      if (trade.type === 'buy') {
+        const buyAmount = parseFloat(trade.amount) || 0;
+        const buyShares = parseFloat(trade.shares) || (price > 0 ? buyAmount / price : 0);
+        runningShares += buyShares;
+        runningCost += buyAmount;
+        runningAvgCost = runningShares > 0 ? runningCost / runningShares : price;
+      } else if (trade.type === 'sell') {
+        const sellShares = parseFloat(trade.shares) || 0;
+        const sellAmount = parseFloat(trade.amount) || (sellShares * price);
+        const costDeduction = sellShares * runningAvgCost;
+        runningShares = Math.max(0, runningShares - sellShares);
+        runningCost = Math.max(0, runningCost - costDeduction);
+        runningAvgCost = runningShares > 0 ? runningCost / runningShares : runningAvgCost;
+        trade.realizedProfit = sellAmount - costDeduction;
+      }
+    }
+
+    fund.shares = runningShares;
+    fund.totalCost = runningCost;
+    fund.avgCost = runningAvgCost;
+    fund.lastTradePrice = lastPrice;
+
+    // 联动基准价格
+    if (fund.buyAnchorMode === 'avgCost') fund.buyBenchmarkPrice = runningAvgCost;
+    if (fund.buyAnchorMode === 'lastTrade') fund.buyBenchmarkPrice = lastPrice;
+    if (fund.sellAnchorMode === 'avgCost') fund.sellBenchmarkPrice = runningAvgCost;
+    if (fund.sellAnchorMode === 'lastTrade') fund.sellBenchmarkPrice = lastPrice;
+
     return fund;
   }
 };

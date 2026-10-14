@@ -15,6 +15,8 @@
   let isAlertBannerHiddenByUser = false; // 用户是否点击了“收起”
   let isLinking = false; // 防持仓字段联动循环触发
   let lastProfitField = 'amount'; // 记录最近编辑收益项：'amount' | 'rate'
+  let isTradeLinking = false; // 防修改交易字段联动循环触发
+  let lastEditedTradeField = 'amount'; // 记录修改加减仓最近编辑项：'amount' | 'shares'
 
   // DOM 元素引用
   const elements = {
@@ -82,6 +84,25 @@
     tradeAutoConfirmOption: document.getElementById('tradeAutoConfirmOption'),
     chkAutoConfirmNav: document.getElementById('chkAutoConfirmNav'),
     btnSubmitTrade: document.getElementById('btnSubmitTrade'),
+
+    // 修改加减仓记录弹窗
+    modalEditTrade: document.getElementById('modalEditTrade'),
+    formEditTrade: document.getElementById('formEditTrade'),
+    modalEditTradeTitle: document.getElementById('modalEditTradeTitle'),
+    editTradeFundId: document.getElementById('editTradeFundId'),
+    editTradeId: document.getElementById('editTradeId'),
+    editTradeType: document.getElementById('editTradeType'),
+    editTradeFundInfo: document.getElementById('editTradeFundInfo'),
+    editTradeTypeBadge: document.getElementById('editTradeTypeBadge'),
+    editTradeDate: document.getElementById('editTradeDate'),
+    editTradePrice: document.getElementById('editTradePrice'),
+    editTradeAmount: document.getElementById('editTradeAmount'),
+    editTradeAmountLabel: document.getElementById('editTradeAmountLabel'),
+    editTradeShares: document.getElementById('editTradeShares'),
+    editTradeSharesLabel: document.getElementById('editTradeSharesLabel'),
+    editTradeRemark: document.getElementById('editTradeRemark'),
+    btnDeleteTrade: document.getElementById('btnDeleteTrade'),
+    btnSubmitEditTrade: document.getElementById('btnSubmitEditTrade'),
 
     // 策略参数配置弹窗
     modalStrategyConfig: document.getElementById('modalStrategyConfig'),
@@ -993,6 +1014,39 @@
       });
     }
 
+    // 时间轴弹窗中点击交易修改
+    if (elements.timelineContainer) {
+      elements.timelineContainer.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action="edit-trade"]');
+        if (!btn) return;
+        const fundId = btn.getAttribute('data-fund-id');
+        const tradeId = btn.getAttribute('data-trade-id');
+        if (fundId && tradeId) {
+          openEditTradeModal(fundId, tradeId);
+        }
+      });
+    }
+
+    // 修改加减仓记录输入联动与表单事件
+    if (elements.editTradeAmount) {
+      elements.editTradeAmount.addEventListener('input', syncEditTradeFromAmount);
+    }
+    if (elements.editTradeShares) {
+      elements.editTradeShares.addEventListener('input', syncEditTradeFromShares);
+    }
+    if (elements.editTradePrice) {
+      elements.editTradePrice.addEventListener('input', syncEditTradeFromPrice);
+    }
+    if (elements.formEditTrade) {
+      elements.formEditTrade.addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveEditTradeRecord();
+      });
+    }
+    if (elements.btnDeleteTrade) {
+      elements.btnDeleteTrade.addEventListener('click', deleteTradeRecord);
+    }
+
     // 添加基金：输入代码防抖自动联想
     let debounceTimer = null;
     elements.inputFundCode.addEventListener('input', (e) => {
@@ -1636,8 +1690,12 @@
         dotClass = 'dot-pending';
       }
 
+      if (!trade.id) trade.id = `trade_${idx}_${trade.timestamp || Date.now()}`;
+
       events.push({
-        id: trade.id || `trade_${idx}`,
+        id: trade.id,
+        tradeId: trade.id,
+        canEdit: true,
         type: isBuy ? 'buy' : 'sell',
         title: isPending ? (isBuy ? '加仓申报 (待官方净值确认)' : '减仓申报 (待官方净值确认)') : (isBuy ? '加仓买入记账' : '减仓赎回记账'),
         timeStr: tradeTimeStr,
@@ -1700,7 +1758,10 @@
                     <span class="timeline-tag ${ev.tagClass}">${ev.tagText}</span>
                     ${isLatest ? '<span class="timeline-latest-pill"><span class="pill-dot" style="width: 5px; height: 5px; background: #60a5fa; animation: pulse-dot 1s infinite;"></span> 最新事件</span>' : ''}
                   </div>
-                  <span class="timeline-time tabular-nums">${ev.timeStr}</span>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    ${ev.canEdit ? `<button type="button" class="timeline-btn-edit" data-action="edit-trade" data-fund-id="${fund.id}" data-trade-id="${ev.tradeId}" title="修改此笔交易的金额、净值与份额">✏️ 修改</button>` : ''}
+                    <span class="timeline-time tabular-nums">${ev.timeStr}</span>
+                  </div>
                 </div>
                 <div class="timeline-body">${ev.content}</div>
                 ${ev.subDetail ? `<div class="timeline-sub-detail">${ev.subDetail}</div>` : ''}
@@ -1950,6 +2011,182 @@
   }
 
   /**
+   * 打开修改加减仓记录弹窗
+   */
+  function openEditTradeModal(fundId, tradeId) {
+    const fund = currentFunds.find(f => f.id === fundId);
+    if (!fund || !Array.isArray(fund.trades)) return;
+    const trade = fund.trades.find(t => t.id === tradeId);
+    if (!trade) return;
+
+    elements.formEditTrade.reset();
+    elements.editTradeFundId.value = fundId;
+    elements.editTradeId.value = tradeId;
+    elements.editTradeType.value = trade.type;
+    elements.editTradeFundInfo.textContent = `${fund.name} (${fund.code})`;
+
+    const isBuy = trade.type === 'buy';
+    if (isBuy) {
+      elements.modalEditTradeTitle.textContent = '修改加仓记录 (申购)';
+      elements.editTradeTypeBadge.className = 'timeline-tag tag-buy';
+      elements.editTradeTypeBadge.textContent = '➕ 加仓申购';
+      elements.editTradeAmountLabel.textContent = '申购加仓金额 (元)';
+      elements.editTradeSharesLabel.textContent = '确认份额 (份)';
+      lastEditedTradeField = 'amount';
+    } else {
+      elements.modalEditTradeTitle.textContent = '修改减仓记录 (赎回)';
+      elements.editTradeTypeBadge.className = 'timeline-tag tag-sell';
+      elements.editTradeTypeBadge.textContent = '➖ 减仓赎回';
+      elements.editTradeAmountLabel.textContent = '赎回减仓金额 (元)';
+      elements.editTradeSharesLabel.textContent = '赎回份额 (份)';
+      lastEditedTradeField = 'shares';
+    }
+
+    elements.editTradeDate.value = trade.date || new Date().toISOString().split('T')[0];
+    const price = (Number(trade.price) || (Number(trade.shares) > 0 ? Number(trade.amount) / Number(trade.shares) : 1.0));
+    elements.editTradePrice.value = price.toFixed(4);
+
+    const shares = Number(trade.shares) || 0;
+    elements.editTradeShares.value = shares.toFixed(2);
+
+    const amount = (Number(trade.amount) || (shares * price));
+    elements.editTradeAmount.value = amount.toFixed(2);
+
+    elements.editTradeRemark.value = trade.remark || '';
+    openModal(elements.modalEditTrade);
+  }
+
+  function syncEditTradeFromAmount() {
+    if (isTradeLinking) return;
+    isTradeLinking = true;
+    try {
+      lastEditedTradeField = 'amount';
+      const amount = parseFloat(elements.editTradeAmount.value);
+      const price = parseFloat(elements.editTradePrice.value);
+      if (!isNaN(amount) && !isNaN(price) && price > 0) {
+        elements.editTradeShares.value = (amount / price).toFixed(2);
+      }
+    } finally {
+      isTradeLinking = false;
+    }
+  }
+
+  function syncEditTradeFromShares() {
+    if (isTradeLinking) return;
+    isTradeLinking = true;
+    try {
+      lastEditedTradeField = 'shares';
+      const shares = parseFloat(elements.editTradeShares.value);
+      const price = parseFloat(elements.editTradePrice.value);
+      if (!isNaN(shares) && !isNaN(price) && price > 0) {
+        elements.editTradeAmount.value = (shares * price).toFixed(2);
+      }
+    } finally {
+      isTradeLinking = false;
+    }
+  }
+
+  function syncEditTradeFromPrice() {
+    if (isTradeLinking) return;
+    isTradeLinking = true;
+    try {
+      const price = parseFloat(elements.editTradePrice.value);
+      if (!isNaN(price) && price > 0) {
+        if (lastEditedTradeField === 'shares') {
+          const shares = parseFloat(elements.editTradeShares.value);
+          if (!isNaN(shares) && shares > 0) {
+            elements.editTradeAmount.value = (shares * price).toFixed(2);
+          }
+        } else {
+          const amount = parseFloat(elements.editTradeAmount.value);
+          if (!isNaN(amount) && amount > 0) {
+            elements.editTradeShares.value = (amount / price).toFixed(2);
+          }
+        }
+      }
+    } finally {
+      isTradeLinking = false;
+    }
+  }
+
+  /**
+   * 保存修改的交易记录并严格确保 金额 = 份额 * 净值
+   */
+  function saveEditTradeRecord() {
+    const fundId = elements.editTradeFundId.value;
+    const tradeId = elements.editTradeId.value;
+    const fund = currentFunds.find(f => f.id === fundId);
+    if (!fund || !Array.isArray(fund.trades)) return;
+
+    const trade = fund.trades.find(t => t.id === tradeId);
+    if (!trade) return;
+
+    const price = parseFloat(elements.editTradePrice.value) || 0;
+    const shares = parseFloat(elements.editTradeShares.value) || 0;
+    const amountInput = parseFloat(elements.editTradeAmount.value) || 0;
+    const date = elements.editTradeDate.value;
+    const remark = elements.editTradeRemark.value.trim();
+
+    if (price <= 0) {
+      alert('请输入有效的成交确认净值！');
+      return;
+    }
+    if (shares <= 0 || amountInput <= 0) {
+      alert('加减仓金额与份额必须大于 0！');
+      return;
+    }
+
+    // 严格确保 金额 = 确认份额 * 净值
+    const exactAmount = Number((shares * price).toFixed(2));
+
+    trade.price = price;
+    trade.shares = shares;
+    trade.amount = exactAmount;
+    trade.date = date;
+    trade.remark = remark;
+    trade.status = 'confirmed';
+    trade.isEstimated = false;
+    trade.confirmedNav = price;
+    trade.confirmedAt = new Date().toISOString();
+
+    // 重新推演持仓与加权成本
+    FundStrategy.recalculateFundPositions(fund);
+    FundStorage.updateFund(fund);
+
+    loadFunds();
+    closeModal(elements.modalEditTrade);
+    openTimelineModal(fund.id); // 刷新时间轴展示
+    refreshData(false);
+
+    showToast(`✅ <strong>交易已更新</strong><br>已按 <strong>¥${exactAmount.toFixed(2)} = ${shares.toFixed(2)} 份 × ¥${price.toFixed(4)}</strong> 完成校准并重算持仓！`, 3500);
+  }
+
+  /**
+   * 删除指定的加减仓记录
+   */
+  function deleteTradeRecord() {
+    const fundId = elements.editTradeFundId.value;
+    const tradeId = elements.editTradeId.value;
+    const fund = currentFunds.find(f => f.id === fundId);
+    if (!fund || !Array.isArray(fund.trades)) return;
+
+    if (!confirm('确定要删除这笔交易记录吗？删除后将依据剩余交易重新计算持仓份额与成本！此操作不可逆。')) {
+      return;
+    }
+
+    fund.trades = fund.trades.filter(t => t.id !== tradeId);
+    FundStrategy.recalculateFundPositions(fund);
+    FundStorage.updateFund(fund);
+
+    loadFunds();
+    closeModal(elements.modalEditTrade);
+    openTimelineModal(fund.id);
+    refreshData(false);
+
+    showToast('🗑️ 该笔交易记录已删除，持仓已重新计算！', 3000);
+  }
+
+  /**
    * 打开策略微调弹窗
    */
   function openStrategyModal(fundId) {
@@ -2178,6 +2415,7 @@
     openAddModal,
     openEditModal,
     openTradeModal,
+    openEditTradeModal,
     openStrategyModal,
     openTimelineModal,
     deleteFundConfirm,
