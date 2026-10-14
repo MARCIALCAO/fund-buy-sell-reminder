@@ -344,9 +344,12 @@
       // 渲染金字塔阶梯横向指示刻度
       const ladderTrackHtml = renderLadderTrack(item);
 
-      // 锚点说明
+      // 锚点说明与格式化
       const anchorDesc = fund.anchorMode === 'avgCost' ? '持仓均价' : (fund.anchorMode === 'lastTrade' ? '最近成交价' : '初始建仓价');
       const sharesFormatted = (Number(item.shares) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const shortNavDate = item.navDate ? (item.navDate.length > 5 ? item.navDate.slice(5) : item.navDate) : '';
+      const timeOnly = item.gzTime ? (item.gzTime.includes(' ') ? item.gzTime.split(' ')[1] : item.gzTime) : '';
+      const gzTimeDisplay = item.hasValuation ? `${timeOnly} 估值` : '收盘净值计';
 
       card.innerHTML = `
         <div class="fund-header">
@@ -359,11 +362,12 @@
               <span>基准: ${anchorDesc} (¥${item.basePrice.toFixed(4)})</span>
             </div>
           </div>
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+          <div class="fund-rate-group">
             <div class="fund-rate-badge ${rateClass} tabular-nums">
-              今日预估 ${rateText}
+              <span class="rate-label">今日预估</span>
+              <span>${rateText}</span>
             </div>
-            <span style="font-size: 11px; color: var(--text-muted)">${item.hasValuation ? '估值时间 ' + item.gzTime : '非盘中时间'}</span>
+            <span class="fund-gz-time">${gzTimeDisplay}</span>
           </div>
         </div>
 
@@ -373,7 +377,7 @@
             <div class="metric-col">
               <span class="metric-title">单位净值</span>
               <span class="metric-number tabular-nums">
-                ¥${item.officialNav.toFixed(4)}${item.navDate ? `<span class="metric-date">(${item.navDate})</span>` : ''}
+                ¥${item.officialNav.toFixed(4)}${shortNavDate ? `<span class="metric-date">(${shortNavDate})</span>` : ''}
               </span>
             </div>
 
@@ -390,12 +394,15 @@
             <div class="metric-col">
               <span class="metric-title">累计持有收益 (盈亏率)</span>
               <span class="metric-number tabular-nums ${pnlRateClass}">
-                ${(item.totalProfit >= 0 ? '+¥' : '-¥') + Math.abs(item.totalProfit).toFixed(2)} (${pnlRateText})
+                ${(item.totalProfit >= 0 ? '+¥' : '-¥') + Math.abs(item.totalProfit).toFixed(2)}
+                <span class="metric-rate-sub">(${pnlRateText})</span>
               </span>
             </div>
           </div>
 
-          <div class="metrics-divider"></div>
+          <div class="metrics-divider">
+            <span class="divider-text">盘中估算与成本参考</span>
+          </div>
 
           <!-- 第二行：盘中估值、浮动与成本基准 -->
           <div class="metrics-row">

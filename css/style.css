@@ -173,7 +173,7 @@ html, body {
 }
 
 /* ==========================================================================
-   Header 导航栏
+   Header 导航栏 (响应式两段式结构，桌面单行，移动端自适应分层)
    ========================================================================== */
 .navbar {
   display: flex;
@@ -186,12 +186,22 @@ html, body {
   border: 1px solid var(--border-glass);
   backdrop-filter: blur(var(--blur-lg)) saturate(190%);
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(190%);
+  gap: 14px;
+}
+
+.nav-main-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 12px;
 }
 
 .brand-section {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .brand-icon {
@@ -206,6 +216,13 @@ html, body {
   font-size: 18px;
   font-weight: 700;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  flex-shrink: 0;
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .brand-title {
@@ -213,12 +230,28 @@ html, body {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .brand-sub {
   font-size: 11px;
   color: var(--text-muted);
   font-weight: 500;
+  white-space: nowrap;
+}
+
+.nav-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.nav-sub-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .nav-actions {
@@ -246,6 +279,9 @@ html, body {
   user-select: none;
   -webkit-user-select: none;
   min-height: 38px;
+  white-space: nowrap;
+  word-break: keep-all;
+  flex-shrink: 0;
 }
 
 .btn:active {
@@ -273,7 +309,7 @@ html, body {
 .btn-sm {
   padding: 5px 10px;
   font-size: 12px;
-  min-height: 30px;
+  min-height: 32px;
   border-radius: var(--radius-sm);
 }
 
@@ -289,6 +325,9 @@ html, body {
   background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.25);
   color: var(--color-accent);
+  white-space: nowrap;
+  word-break: keep-all;
+  flex-shrink: 0;
 }
 
 .snapshot-pill.done {
@@ -309,6 +348,9 @@ html, body {
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
+  white-space: nowrap;
+  word-break: keep-all;
+  flex-shrink: 0;
 }
 
 .btn-signal-pill:hover {
@@ -348,16 +390,19 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .alert-content {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .alert-icon {
   font-size: 24px;
+  flex-shrink: 0;
 }
 
 .alert-title {
@@ -370,6 +415,14 @@ html, body {
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: 2px;
+  word-break: break-word;
+}
+
+.alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* ==========================================================================
@@ -487,29 +540,35 @@ html, body {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .fund-info-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .fund-name {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.01em;
   display: flex;
   align-items: center;
   gap: 8px;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .fund-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -521,44 +580,73 @@ html, body {
   padding: 1px 6px;
   border-radius: 4px;
   color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.fund-rate-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .fund-rate-badge {
   display: inline-flex;
   align-items: center;
-  padding: 6px 12px;
-  border-radius: var(--radius-md);
-  font-size: 15px;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
-/* 卡片指标分层框：分成清晰独立的两行，不再挤在一起 */
+.fund-rate-badge .rate-label {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.fund-gz-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* 卡片指标分层框：分成清晰独立的两行与毛玻璃微卡片 */
 .fund-metrics-box {
   display: flex;
   flex-direction: column;
-  padding: 16px 18px;
+  padding: 14px;
   border-radius: var(--radius-md);
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-glass);
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .metrics-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px 14px;
-}
-
-.metrics-divider {
-  height: 1px;
-  background: var(--border-glass);
-  margin: 14px 0;
+  gap: 10px;
 }
 
 .metric-col {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  min-height: 58px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.metric-col:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .metric-title {
@@ -566,20 +654,53 @@ html, body {
   font-weight: 500;
   color: var(--text-muted);
   margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metric-number {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.3;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metric-date {
   font-size: 11px;
   color: var(--text-muted);
-  font-weight: normal;
+  font-weight: 400;
   margin-left: 3px;
+}
+
+.metric-rate-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-left: 3px;
+}
+
+.metrics-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 10px 0;
+}
+
+.metrics-divider::before,
+.metrics-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.divider-text {
+  padding: 0 10px;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
 }
 
 /* ==========================================================================
@@ -851,35 +972,269 @@ html, body {
 }
 
 /* ==========================================================================
-   响应式断点 (Mobile & Desktop)
+   响应式断点 (Mobile & Desktop 极致排版优化)
    ========================================================================== */
 @media (max-width: 768px) {
   .app-container {
     padding-left: 12px;
     padding-right: 12px;
+    padding-top: calc(var(--safe-top) + 12px);
+    padding-bottom: calc(var(--safe-bottom) + 60px);
   }
 
-  .summary-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px 12px;
-    padding: 16px;
-  }
-
-  .fund-metrics-grid, .metrics-row {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px 10px;
-  }
-
-  .next-action-row {
-    grid-template-columns: 1fr;
-  }
-
+  /* 顶部导航栏：双层布局，杜绝单字竖折与挤压 */
   .navbar {
-    padding: 10px 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+  }
+
+  .nav-main-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
   }
 
   .brand-title {
     font-size: 16px;
+  }
+
+  .brand-sub {
+    display: none; /* 移动端隐藏副标题，为操作按钮释放横向空间 */
+  }
+
+  .brand-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .nav-tools {
+    gap: 6px;
+  }
+
+  .nav-tools .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 32px;
+  }
+
+  .nav-sub-bar {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    margin-left: 0;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav-sub-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 买卖告警横幅移动端优化 */
+  .alert-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .alert-banner.active {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .alert-banner .alert-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
+  }
+
+  /* 资产总览统计卡片 */
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px 10px;
+    padding: 14px 12px;
+    margin-bottom: 16px;
+  }
+
+  .summary-label {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .summary-value {
+    font-size: 18px;
+  }
+
+  .summary-sub {
+    font-size: 11px;
+  }
+
+  /* 基金卡片内边距与头部紧凑化 */
+  .fund-card {
+    padding: 14px 12px;
+  }
+
+  .fund-header {
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+
+  .fund-name {
+    font-size: 15px;
+  }
+
+  .fund-meta {
+    font-size: 11px;
+    gap: 6px 8px;
+  }
+
+  .fund-rate-badge {
+    padding: 4px 8px;
+    font-size: 13px;
+  }
+
+  .fund-gz-time {
+    font-size: 10.5px;
+  }
+
+  /* 指标分层微卡片：2x2 网格，清晰独立 */
+  .fund-metrics-box {
+    padding: 10px;
+    margin-bottom: 14px;
+  }
+
+  .metrics-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .metric-col {
+    padding: 8px 10px;
+    min-height: 52px;
+  }
+
+  .metric-title {
+    font-size: 10.5px;
+    margin-bottom: 2px;
+  }
+
+  .metric-number {
+    font-size: 13.5px;
+  }
+
+  .metric-rate-sub {
+    font-size: 11px;
+  }
+
+  .metric-date {
+    font-size: 10px;
+  }
+
+  .divider-text {
+    font-size: 9.5px;
+    padding: 0 8px;
+  }
+
+  /* 阶梯决策指示区 */
+  .ladder-section {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+
+  .ladder-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .anchor-tag {
+    font-size: 10.5px;
+  }
+
+  .next-action-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .action-pill {
+    padding: 8px 10px;
+    font-size: 11.5px;
+  }
+
+  .action-header {
+    font-size: 11.5px;
+  }
+
+  .action-detail {
+    font-size: 11px;
+  }
+
+  /* 卡片操作按钮：人体工学双列自适应排布，方便单手触达 */
+  .fund-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding-top: 10px;
+    margin-top: 12px;
+  }
+
+  .fund-card-actions button {
+    width: 100%;
+    margin: 0;
+    padding: 8px 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    justify-content: center;
+  }
+
+  .fund-card-actions button[data-action="buy"] {
+    grid-column: 1 / 2;
+  }
+
+  .fund-card-actions button[data-action="sell"] {
+    grid-column: 2 / 3;
+  }
+
+  .fund-card-actions button[data-action="edit"] {
+    grid-column: 1 / 2;
+  }
+
+  .fund-card-actions button[data-action="strategy"] {
+    grid-column: 2 / 3;
+  }
+
+  .fund-card-actions button[data-action="delete"] {
+    grid-column: 1 / -1;
+    min-height: 28px;
+    padding: 4px;
+    font-size: 11px;
+    color: var(--text-dim) !important;
+    background: transparent;
+    border: none;
+  }
+
+  /* 弹窗在手机端贴合度 */
+  .modal-content {
+    padding: 18px 14px;
+    max-height: 94vh;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 }
 

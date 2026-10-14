@@ -25,15 +25,36 @@
   <div class="app-container">
     <!-- 顶部导航栏 -->
     <header class="navbar">
-      <div class="brand-section">
-        <div class="brand-icon">▲</div>
-        <div>
-          <div class="brand-title">基金金字塔策略助手</div>
-          <div class="brand-sub">实时估值 · 阶梯提示 · 纯本地私密</div>
+      <div class="nav-main-bar">
+        <div class="brand-section">
+          <div class="brand-icon">▲</div>
+          <div class="brand-info">
+            <div class="brand-title">基金金字塔策略助手</div>
+            <div class="brand-sub">实时估值 · 阶梯提示 · 纯本地私密</div>
+          </div>
+        </div>
+
+        <div class="nav-tools">
+          <!-- 立即刷新按钮 -->
+          <button id="btnRefresh" class="btn btn-sm" title="立即刷新最新估值">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span class="btn-text">刷新</span>
+          </button>
+
+          <!-- 设置与备份 -->
+          <button id="btnOpenSettings" class="btn btn-sm btn-icon-only" title="设置与数据备份">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+
+          <!-- 添加基金 -->
+          <button id="btnOpenAddFund" class="btn btn-sm btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>添加基金</span>
+          </button>
         </div>
       </div>
 
-      <div class="nav-actions">
+      <div class="nav-sub-bar" id="navSubBar">
         <!-- 买卖信号快捷提醒按钮 (触发信号时常驻，支持随时点击重新弹出/收起横幅) -->
         <button id="btnToggleSignalAlert" class="btn btn-sm btn-signal-pill" style="display: none;" title="点击重新展开/收起买卖信号提醒">
           <span class="pill-dot" style="background-color: var(--color-up); animation: pulse-dot 1.2s infinite ease-in-out;"></span>
@@ -45,23 +66,6 @@
           <span class="pill-dot"></span>
           <span id="snapshotStatusText">14:00 待抓取</span>
         </div>
-
-        <!-- 立即刷新按钮 -->
-        <button id="btnRefresh" class="btn btn-sm" title="立即刷新最新估值">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-          <span class="btn-text">刷新</span>
-        </button>
-
-        <!-- 设置与备份 -->
-        <button id="btnOpenSettings" class="btn btn-sm btn-icon-only" title="设置与数据备份">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </button>
-
-        <!-- 添加基金 -->
-        <button id="btnOpenAddFund" class="btn btn-sm btn-primary">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span>添加基金</span>
-        </button>
       </div>
     </header>
 
@@ -74,7 +78,7 @@
           <div id="alertDesc" class="alert-desc">检测到部分基金估值触及策略买入或卖出档位</div>
         </div>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
+      <div class="alert-actions">
         <button id="btnCopySignal" class="btn btn-sm" style="background: rgba(255,255,255,0.12)">复制操作建议</button>
         <button id="btnCloseAlert" class="btn btn-sm" style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass);" title="暂时收起横幅（可点击顶部“买卖提醒”随时重新展开）">收起 ✕</button>
       </div>
