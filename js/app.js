@@ -627,10 +627,16 @@
 
   /**
    * 生成阶梯可视化刻度条（支持动态档位数量）
+   * 若未触及最小买卖点，则在“基准”对应的刻度条处亮起绿灯指示当前处于正常持仓区间
    */
   function renderLadderTrack(item) {
     const buyTiers = item.buyLadders || [];
     const sellTiers = item.sellLadders || [];
+
+    // 判断是否未达到最小买卖点（即当前净值处于基准区间）
+    const hasTriggeredBuy = buyTiers.some(t => t.isTriggered);
+    const hasTriggeredSell = sellTiers.some(t => t.isTriggered);
+    const isBaseActive = !hasTriggeredBuy && !hasTriggeredSell;
 
     const steps = [];
 
@@ -643,7 +649,11 @@
     }
 
     // 中间基准
-    steps.push({ label: '基准', isBase: true });
+    steps.push({
+      label: '基准',
+      isBase: true,
+      isBaseActive: isBaseActive
+    });
 
     // 卖出档位
     for (let i = 0; i < sellTiers.length; i++) {
@@ -656,14 +666,23 @@
     let barsHtml = '';
     steps.forEach(step => {
       let activeClass = '';
+      let isBaseActiveStep = false;
+
       if (step.buyTier && step.buyTier.isTriggered) {
         activeClass = 'active-buy';
       } else if (step.sellTier && step.sellTier.isTriggered) {
         activeClass = 'active-sell';
+      } else if (step.isBase && step.isBaseActive) {
+        activeClass = 'active-base';
+        isBaseActiveStep = true;
       }
 
+      const itemTooltip = step.isBase && step.isBaseActive
+        ? 'title="当前处于基准持仓区间（未达加减仓点位）"'
+        : '';
+
       barsHtml += `
-        <div class="tier-step-item">
+        <div class="tier-step-item ${isBaseActiveStep ? 'is-base-active' : ''}" ${itemTooltip}>
           <div class="tier-bar ${activeClass}"></div>
           <span class="tier-label">${step.label}</span>
         </div>

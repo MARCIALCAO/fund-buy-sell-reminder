@@ -985,6 +985,7 @@ html, body {
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.08);
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .tier-bar.active-buy {
@@ -997,10 +998,22 @@ html, body {
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
 }
 
+/* 基准区间常亮：刻度槽绿色常亮高亮 */
+.tier-bar.active-base {
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
 .tier-label {
   font-size: 10px;
   font-weight: 600;
   color: var(--text-dim);
+  transition: color 0.25s ease;
+}
+
+.tier-step-item.is-base-active .tier-label {
+  color: #10b981;
+  font-weight: 700;
 }
 
 /* 卡片操作按钮栏 */
