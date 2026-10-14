@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark" data-color-mode="cn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="中国基金金字塔与倒金字塔买卖策略助手，实时估值抓取、智能点位提示、持仓记账">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="基金金字塔">
+  <meta name="theme-color" content="#0a0e17">
+  
+  <title>基金金字塔买卖助手 | Pyramid Fund Master</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+</head>
+<body>
+  <!-- 背景磨砂环境光晕 (Progressive Ambient Glow) -->
+  <div class="ambient-glow">
+    <div class="glow-orb-1"></div>
+    <div class="glow-orb-2"></div>
+  </div>
+
+  <div class="app-container">
+    <!-- 顶部导航栏 -->
+    <header class="navbar">
+      <div class="brand-section">
+        <div class="brand-icon">▲</div>
+        <div>
+          <div class="brand-title">基金金字塔策略助手</div>
+          <div class="brand-sub">实时估值 · 阶梯提示 · 纯本地私密</div>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <!-- 买卖信号快捷提醒按钮 (触发信号时常驻，支持随时点击重新弹出/收起横幅) -->
+        <button id="btnToggleSignalAlert" class="btn btn-sm btn-signal-pill" style="display: none;" title="点击重新展开/收起买卖信号提醒">
+          <span class="pill-dot" style="background-color: var(--color-up); animation: pulse-dot 1.2s infinite ease-in-out;"></span>
+          <span id="signalBadgeText">买卖提醒</span>
+        </button>
+
+        <!-- 14:00 定时抓取状态指示 -->
+        <div id="snapshotStatusPill" class="snapshot-pill" title="交易日 14:00 定时抓取一次">
+          <span class="pill-dot"></span>
+          <span id="snapshotStatusText">14:00 待抓取</span>
+        </div>
+
+        <!-- 立即刷新按钮 -->
+        <button id="btnRefresh" class="btn btn-sm" title="立即刷新最新估值">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          <span class="btn-text">刷新</span>
+        </button>
+
+        <!-- 设置与备份 -->
+        <button id="btnOpenSettings" class="btn btn-sm btn-icon-only" title="设置与数据备份">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+
+        <!-- 添加基金 -->
+        <button id="btnOpenAddFund" class="btn btn-sm btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>添加基金</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 买卖信号告警横幅 (触发时展示，点叉后隐藏并可在顶部随时重新唤出) -->
+    <div id="signalAlertBanner" class="alert-banner">
+      <div class="alert-content">
+        <div class="alert-icon">🚨</div>
+        <div>
+          <div id="alertTitle" class="alert-title">今日买卖触发信号</div>
+          <div id="alertDesc" class="alert-desc">检测到部分基金估值触及策略买入或卖出档位</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button id="btnCopySignal" class="btn btn-sm" style="background: rgba(255,255,255,0.12)">复制操作建议</button>
+        <button id="btnCloseAlert" class="btn btn-sm" style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass);" title="暂时收起横幅（可点击顶部“买卖提醒”随时重新展开）">收起 ✕</button>
+      </div>
+    </div>
+
+    <!-- 资产总览统计卡片 -->
+    <section class="glass-panel summary-grid">
+      <div class="summary-item">
+        <div class="summary-label">
+          <span>总持仓市值 (元)</span>
+        </div>
+        <div id="sumTotalValue" class="summary-value tabular-nums">¥0.00</div>
+        <div id="sumPlannedBudget" class="summary-sub" style="color: var(--text-muted)">计划预算: ¥0.00</div>
+      </div>
+
+      <div class="summary-item">
+        <div class="summary-label">
+          <span>累计总投入成本</span>
+        </div>
+        <div id="sumTotalCost" class="summary-value tabular-nums">¥0.00</div>
+        <div id="sumCostCoverage" class="summary-sub" style="color: var(--text-muted)">资金利用率: 0.0%</div>
+      </div>
+
+      <div class="summary-item">
+        <div class="summary-label">
+          <span>累计总盈亏</span>
+        </div>
+        <div id="sumTotalProfit" class="summary-value tabular-nums">¥0.00</div>
+        <div id="sumProfitRate" class="summary-sub tabular-nums">0.00%</div>
+      </div>
+
+      <div class="summary-item">
+        <div class="summary-label">
+          <span>今日预估浮动</span>
+        </div>
+        <div id="sumTodayProfit" class="summary-value tabular-nums">¥0.00</div>
+        <div id="sumLastUpdated" class="summary-sub" style="color: var(--text-dim)">更新: --:--</div>
+      </div>
+    </section>
+
+    <!-- 基金持仓与金字塔买卖点列表 -->
+    <main>
+      <div class="section-header">
+        <div class="section-title">
+          <span>持仓基金与金字塔策略</span>
+          <span id="fundCountBadge" class="section-count">0</span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted)">
+          默认基准：初始建仓成本价 · 跌买涨卖
+        </div>
+      </div>
+
+      <!-- 动态基金卡片列表 -->
+      <div id="fundListContainer" class="fund-list">
+        <!-- JS 动态注入基金卡片 -->
+      </div>
+    </main>
+  </div>
+
+  <!-- ==========================================================================
+       添加/编辑基金弹窗
+       ========================================================================== -->
+  <div id="modalAddFund" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalAddFundTitle" class="modal-title">录入持仓基金</h3>
+        <button class="modal-close" data-close="modalAddFund">✕</button>
+      </div>
+
+      <form id="formAddFund">
+        <input type="hidden" id="editFundId" value="">
+
+        <div class="form-group">
+          <label class="form-label" for="inputFundCode">
+            <span>基金代码 (6位)</span>
+            <span id="fundQueryStatus" class="form-tip">输入后自动获取名称与净值</span>
+          </label>
+          <input type="text" id="inputFundCode" class="form-input" placeholder="例如：161725 或 001632" required maxlength="6" inputmode="numeric">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="inputFundName">基金名称</label>
+          <input type="text" id="inputFundName" class="form-input" placeholder="输入代码后自动填入" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="inputHoldingAmount">
+              <span>当前持有金额 (元)</span>
+            </label>
+            <input type="number" step="0.01" id="inputHoldingAmount" class="form-input" placeholder="例如：10000" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inputHoldingShares">
+              <span>当前持有份额 (份)</span>
+              <span class="form-tip">选填，自动换算</span>
+            </label>
+            <input type="number" step="0.01" id="inputHoldingShares" class="form-input" placeholder="自动计算">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="inputProfitAmount">
+              <span>当前累计盈亏金额 (元)</span>
+            </label>
+            <input type="number" step="0.01" id="inputProfitAmount" class="form-input" placeholder="如盈利填 500，亏损填 -300">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inputProfitRate">
+              <span>或累计盈亏率 (%)</span>
+              <span class="form-tip">二选一填其一即可</span>
+            </label>
+            <input type="number" step="0.01" id="inputProfitRate" class="form-input" placeholder="例如：5.5 表示 +5.5%">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="inputPlannedAmount">
+              <span>该基金计划总预算 (元)</span>
+              <span class="form-tip">金字塔各档基准</span>
+            </label>
+            <input type="number" step="100" id="inputPlannedAmount" class="form-input" placeholder="例如：20000" value="15000" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="selectAnchorMode">
+              <span>买卖点基准锚点</span>
+            </label>
+            <select id="selectAnchorMode" class="form-select">
+              <option value="initialCost" selected>初始建仓成本价 (默认)</option>
+              <option value="avgCost">当前持仓均价 (动态加权)</option>
+              <option value="lastTrade">最新成交价</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 当前预估参考净值 (只读) -->
+        <input type="hidden" id="inputCurrentNav" value="1.0">
+
+        <div class="modal-footer">
+          <button type="button" class="btn" data-close="modalAddFund">取消</button>
+          <button type="submit" class="btn btn-primary">保存持仓</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       手动加仓/减仓记账弹窗
+       ========================================================================== -->
+  <div id="modalTrade" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTradeTitle" class="modal-title">记录加减仓交易</h3>
+        <button class="modal-close" data-close="modalTrade">✕</button>
+      </div>
+
+      <form id="formTrade">
+        <input type="hidden" id="tradeFundId" value="">
+        <input type="hidden" id="tradeType" value="buy">
+
+        <div class="form-group">
+          <div style="font-size: 15px; font-weight: 700; color: var(--text-primary)" id="tradeFundInfo">--</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="tradeDate">交易日期</label>
+            <input type="date" id="tradeDate" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tradePrice">成交/确认净值</label>
+            <input type="number" step="0.0001" id="tradePrice" class="form-input" placeholder="输入确认净值" required>
+          </div>
+        </div>
+
+        <div id="tradeBuySection" class="form-group">
+          <label class="form-label" for="tradeBuyAmount">
+            <span>申购/加仓金额 (元)</span>
+          </label>
+          <input type="number" step="0.01" id="tradeBuyAmount" class="form-input" placeholder="例如：2000">
+        </div>
+
+        <div id="tradeSellSection" class="form-group" style="display: none;">
+          <label class="form-label" for="tradeSellShares">
+            <span>赎回/减仓份额 (份)</span>
+            <span id="maxSellSharesTip" class="form-tip">当前持有: 0 份</span>
+          </label>
+          <input type="number" step="0.01" id="tradeSellShares" class="form-input" placeholder="例如：1000">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="tradeRemark">备注说明 (选填)</label>
+          <input type="text" id="tradeRemark" class="form-input" placeholder="例如：触发第1档加仓">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn" data-close="modalTrade">取消</button>
+          <button type="submit" id="btnSubmitTrade" class="btn btn-primary">确认记账</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       金字塔策略参数自定义配置弹窗
+       ========================================================================== -->
+  <div id="modalStrategyConfig" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">自定义金字塔/倒金字塔参数</h3>
+        <button class="modal-close" data-close="modalStrategyConfig">✕</button>
+      </div>
+
+      <form id="formStrategyConfig">
+        <input type="hidden" id="configFundId" value="">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="cfgStepPercent">
+              <span>价格触发步长 (%)</span>
+              <span class="form-tip">何时触发买卖</span>
+            </label>
+            <input type="number" step="0.5" id="cfgStepPercent" class="form-input" value="5.0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cfgPlannedAmount">计划总预算 (元)</label>
+            <input type="number" step="100" id="cfgPlannedAmount" class="form-input" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label class="form-label" style="margin-bottom: 0;">
+              <span>各档买卖仓位比例</span>
+              <span id="cfgTotalRatioBadge" style="font-weight: 700; padding: 2px 8px; border-radius: 4px; font-size: 11px; background: rgba(16, 185, 129, 0.2); color: var(--color-down);">合计: 100%</span>
+            </label>
+            <button type="button" id="btnAddTier" class="btn btn-sm" style="padding: 3px 10px; font-size: 12px;">
+              ＋ 增加档位
+            </button>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+            默认 4 档。每档买入计划资金的对应比例，总和<strong>不得超过 100%</strong>。
+          </div>
+
+          <!-- 动态档位格子容器 -->
+          <div id="cfgTiersList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; max-height: 200px; overflow-y: auto;">
+            <!-- JS 动态注入每档输入框与删除按钮 -->
+          </div>
+
+          <!-- 超过 100% 告警提示 -->
+          <div id="cfgTierErrorMsg" style="display: none; color: var(--color-up); font-size: 12px; margin-bottom: 10px; font-weight: 600; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--color-up-bg); border: 1px solid var(--color-up-border);">
+            ⚠️ 各档买卖仓位比例之和已超过 100%，请调整后再保存！
+          </div>
+
+          <!-- 动态实时联动预览卡片 -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">
+              <span>策略执行联动实时预览</span>
+              <span class="form-tip">点位与金额实时对照</span>
+            </label>
+            <div id="cfgPreviewTable" style="background: rgba(0,0,0,0.22); border-radius: var(--radius-sm); padding: 10px 12px; border: 1px solid var(--border-glass); font-size: 12px; line-height: 1.6;">
+              <!-- 由 JS 实时生成 -->
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cfgAnchorMode">基准价锚定方式</label>
+          <select id="cfgAnchorMode" class="form-select">
+            <option value="initialCost">初始建仓成本价 (默认)</option>
+            <option value="avgCost">当前持仓加权均价</option>
+            <option value="lastTrade">最新交易成交价</option>
+          </select>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn" data-close="modalStrategyConfig">取消</button>
+          <button type="submit" class="btn btn-primary">保存策略</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       设置与数据备份弹窗
+       ========================================================================== -->
+  <div id="modalSettings" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">系统偏好与数据备份</h3>
+        <button class="modal-close" data-close="modalSettings">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">界面主题</label>
+        <div class="form-row">
+          <button type="button" id="btnThemeDark" class="btn">🌙 黑曜石磨砂 (深色)</button>
+          <button type="button" id="btnThemeLight" class="btn">☀️ 清新通透 (浅色)</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">涨跌配色习惯</label>
+        <div class="form-row">
+          <button type="button" id="btnColorCn" class="btn">🇨🇳 红涨绿跌 (国内习惯)</button>
+          <button type="button" id="btnColorIntl" class="btn">🌐 绿涨红跌 (国际惯例)</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">提醒方式</label>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+            <input type="checkbox" id="chkSound" checked>
+            <span>开启买卖触发提示音 (Web Audio 原生清脆和弦)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+            <input type="checkbox" id="chkNotify" checked>
+            <span>开启系统 Notification 弹窗权限</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-glass)">
+        <label class="form-label">数据备份与迁移</label>
+        <div class="form-row" style="margin-bottom: 8px;">
+          <button type="button" id="btnExportJSON" class="btn">📥 导出备份文件 (JSON)</button>
+          <button type="button" id="btnTriggerImport" class="btn">📤 导入备份恢复</button>
+          <input type="file" id="fileImportJSON" accept=".json" style="display: none">
+        </div>
+        <div class="form-row">
+          <button type="button" id="btnLoadDemo" class="btn">✨ 载入精选示例基金</button>
+          <button type="button" id="btnClearAll" class="btn" style="color: var(--color-up)">🗑️ 清空所有数据</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-close="modalSettings">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入核心 JS 模块 -->
+  <script src="js/api.js"></script>
+  <script src="js/strategy.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/notification.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
