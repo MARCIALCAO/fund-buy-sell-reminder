@@ -401,7 +401,7 @@
           <div class="metrics-row">
             <div class="metric-col">
               <span class="metric-title">盘中参考估值</span>
-              <span class="metric-number tabular-nums" style="color: var(--text-secondary)">
+              <span class="metric-number tabular-nums">
                 ${item.hasValuation ? '¥' + item.gsz.toFixed(4) : '以净值计'}
               </span>
             </div>
@@ -415,14 +415,14 @@
 
             <div class="metric-col">
               <span class="metric-title">持仓成本均价</span>
-              <span class="metric-number tabular-nums" style="color: var(--text-secondary)">
+              <span class="metric-number tabular-nums">
                 ¥${(Number(item.avgCost) || 0).toFixed(4)}
               </span>
             </div>
 
             <div class="metric-col">
               <span class="metric-title">累计总投入本金</span>
-              <span class="metric-number tabular-nums" style="color: var(--text-secondary)">
+              <span class="metric-number tabular-nums">
                 ¥${(Number(item.totalCost) || 0).toFixed(2)}
               </span>
             </div>
