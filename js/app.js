@@ -13,6 +13,7 @@
   let currentSettings = {};
   let currentEditingTiers = []; // 策略弹窗正在编辑的动态档位数组
   let isAlertBannerHiddenByUser = false; // 用户是否点击了“收起”
+  let latestTriggeredSignals = []; // 最近触发的买卖信号列表
   let isLinking = false; // 防持仓字段联动循环触发
   let lastProfitField = 'amount'; // 记录最近编辑收益项：'amount' | 'rate'
   let isTradeLinking = false; // 防修改交易字段联动循环触发
@@ -37,6 +38,7 @@
     signalBadgeText: document.getElementById('signalBadgeText'),
     signalAlertBanner: document.getElementById('signalAlertBanner'),
     signalAlertItemsContainer: document.getElementById('signalAlertItemsContainer'),
+    alertIcon: document.getElementById('alertIcon'),
     alertTitle: document.getElementById('alertTitle'),
     alertDesc: document.getElementById('alertDesc'),
     btnCopySignal: document.getElementById('btnCopySignal'),
@@ -802,12 +804,18 @@
       if (buyCount > 0) msg += `${buyCount} 笔买点 `;
       if (sellCount > 0) msg += `${sellCount} 笔卖点`;
 
+      latestTriggeredSignals = triggeredList;
+
+      if (elements.alertIcon) {
+        elements.alertIcon.textContent = unexecutedList.length === 0 ? '✅' : '🚨';
+      }
+
       if (unexecutedList.length === 0) {
-        elements.alertTitle.textContent = `✅ 今日买卖触发点位（已全部执行加减仓）`;
+        elements.alertTitle.textContent = `今日买卖触发点位（已全部执行加减仓）`;
         elements.alertDesc.textContent = `检测到的 ${triggeredList.length} 笔策略触发点位今日均已成功执行记账`;
       } else {
-        elements.alertTitle.textContent = `🚨 买卖点已触及（${msg.trim()}，待执行 ${unexecutedList.length} 笔）`;
-        elements.alertDesc.textContent = `盘中估值已触及金字塔策略设定的买入或卖出点位，可直接点击右侧按钮快捷记账：`;
+        elements.alertTitle.textContent = `买卖点已触及（${msg.trim()}，待执行 ${unexecutedList.length} 笔）`;
+        elements.alertDesc.textContent = `盘中估值已触及金字塔策略设定的买入或卖出点位，可直接在下方卡片快捷执行加减仓：`;
       }
 
       // 渲染动态操作卡片
@@ -886,13 +894,41 @@
    * 复制买卖指令文本
    */
   function copySignalText() {
-    const text = elements.alertDesc.textContent;
-    if (!text) return;
-    navigator.clipboard.writeText(`【金字塔买卖提醒】\n${text}\n执行时间：${new Date().toLocaleTimeString()}`).then(() => {
-      alert('已复制操作建议文本至剪贴板，可直接前往交易软件操作！');
-    }).catch(() => {
-      prompt('请手动复制以下操作指令：', text);
+    if (!latestTriggeredSignals || latestTriggeredSignals.length === 0) {
+      const text = elements.alertDesc ? elements.alertDesc.textContent : '';
+      if (!text) return;
+      navigator.clipboard.writeText(`【金字塔买卖提醒】\n${text}\n执行时间：${new Date().toLocaleTimeString()}`).then(() => {
+        showToast('📋 已复制操作建议文本至剪贴板');
+      }).catch(() => {
+        prompt('请手动复制以下操作指令：', text);
+      });
+      return;
+    }
+
+    const lines = [];
+    const title = elements.alertTitle ? elements.alertTitle.textContent : '今日买卖触发信号';
+    lines.push(`【金字塔买卖操作建议】${title}`);
+    lines.push(`生成时间：${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    lines.push('----------------------------------------');
+    latestTriggeredSignals.forEach((sig, idx) => {
+      const typeStr = sig.type === 'buy' ? '加仓买入' : '减仓卖出';
+      const actionStr = sig.type === 'buy'
+        ? `建议加仓 ¥${(Number(sig.amount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (约 ${(Number(sig.estShares) || 0).toFixed(2)} 份)`
+        : `建议减仓 ${(Number(sig.shares) || 0).toFixed(2)} 份 (约 ¥${(Number(sig.estAmount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+      const statusStr = sig.isExecuted ? ' [已记录执行]' : ' [待执行]';
+      lines.push(`${idx + 1}. ${sig.name} (${sig.code})\n   触发${typeStr}(第${sig.level}档, 触发价 ¥${sig.triggerPrice.toFixed(4)})\n   ${actionStr}${statusStr}`);
     });
+
+    const fullText = lines.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(fullText).then(() => {
+        showToast('📋 已复制买卖操作建议清单至剪贴板，可前往交易软件操作！');
+      }).catch(() => {
+        prompt('请手动长按复制以下操作指令：', fullText);
+      });
+    } else {
+      prompt('请手动长按复制以下操作指令：', fullText);
+    }
   }
 
   /**
