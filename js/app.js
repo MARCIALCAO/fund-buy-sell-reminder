@@ -155,6 +155,10 @@
     bindEvents();
     initMarketStatusTimer();
     restartAutoRefresh();
+    // 后台静默自同步最新节假日数据（非阻塞）
+    if (window.FundHoliday && typeof window.FundHoliday.autoSyncHolidays === 'function') {
+      window.FundHoliday.autoSyncHolidays();
+    }
     await refreshData(false);
   }
 
@@ -216,13 +220,12 @@
     if (!elements.snapshotStatusPill || !elements.snapshotStatusText) return;
 
     const now = new Date();
-    const day = now.getDay(); // 0: 周日, 1-5: 周一至周五, 6: 周六
     const h = now.getHours();
     const m = now.getMinutes();
     const s = now.getSeconds();
     const curSec = h * 3600 + m * 60 + s;
 
-    const isTradingDay = (day >= 1 && day <= 5);
+    const isTradingDay = window.FundHoliday ? window.FundHoliday.isTradingDay(now) : (now.getDay() >= 1 && now.getDay() <= 5);
     const morningOpen = 9 * 3600 + 30 * 60;   // 09:30:00 = 34200
     const morningClose = 11 * 3600 + 30 * 60; // 11:30:00 = 41400
     const afternoonOpen = 13 * 3600;          // 13:00:00 = 46800
@@ -238,29 +241,8 @@
       elements.snapshotStatusPill.className = 'snapshot-pill trading';
       elements.snapshotStatusText.textContent = `实时盘中交易时间：${pad(h)}:${pad(m)}:${pad(s)}`;
     } else {
-      // 计算距离下次开盘的目标时间
-      let target = new Date(now.getTime());
-
-      if (isTradingDay) {
-        if (curSec < morningOpen) {
-          // 00:00:00 - 09:30:00: 今日早盘开盘
-          target.setHours(9, 30, 0, 0);
-        } else if (curSec >= morningClose && curSec < afternoonOpen) {
-          // 11:30:00 - 13:00:00: 午间休市，今日午盘开盘
-          target.setHours(13, 0, 0, 0);
-        } else {
-          // 15:00:00 之后，如果周五则跳到下周一，否则跳到明天
-          const daysToAdd = (day === 5) ? 3 : 1;
-          target.setDate(target.getDate() + daysToAdd);
-          target.setHours(9, 30, 0, 0);
-        }
-      } else {
-        // 周末：周六加2天到周一，周日加1天到周一
-        const daysToAdd = (day === 6) ? 2 : 1;
-        target.setDate(target.getDate() + daysToAdd);
-        target.setHours(9, 30, 0, 0);
-      }
-
+      // 准确获取下次开盘时刻（自动跨越法定节假日、调休与周末）
+      const target = window.FundHoliday ? window.FundHoliday.getNextTradingDayOpen(now) : new Date(now.getTime() + 86400000);
       const diffSec = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000));
       const countdownH = pad(Math.floor(diffSec / 3600));
       const countdownM = pad(Math.floor((diffSec % 3600) / 60));
