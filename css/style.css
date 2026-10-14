@@ -1350,6 +1350,10 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .form-label {
@@ -1369,6 +1373,9 @@ html, body {
 
 .form-input, .form-select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 10px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-glass);
@@ -1384,10 +1391,66 @@ html, body {
   border-color: var(--border-focus);
 }
 
+/* 日期输入框专属优化 (彻底修复移动端/iOS Safari/安卓端原生日期框宽度溢出超标) */
+input[type="date"].form-input,
+.form-input[type="date"] {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  position: relative;
+  background-color: var(--bg-input);
+  line-height: normal;
+  min-height: 42px;
+}
+
+/* iOS Safari 日期文字基线与行高修复 */
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  line-height: 1.4;
+  height: 1.4em;
+  margin: 0;
+  padding: 0;
+}
+
+/* 日期选择指示图标样式与间距 */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: block;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.2s ease;
+  margin-left: auto;
+  padding: 0;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+}
+
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.form-row > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .modal-footer {
@@ -1987,14 +2050,28 @@ html, body {
   }
 
   /* 弹窗在手机端贴合度 */
+  .modal-overlay {
+    padding: 12px;
+  }
+
   .modal-content {
     padding: 18px 14px;
     max-height: 94vh;
+    max-width: calc(100vw - 24px);
+    width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
 
   .form-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
+    width: 100%;
+  }
+
+  .form-row > * {
+    min-width: 0;
+    max-width: 100%;
   }
 }
 
