@@ -14,6 +14,8 @@ const FundStorage = {
     theme: 'dark', // 'dark' (深邃暗黑磨砂玻璃) | 'light' (通透清新浅色)
     soundEnabled: true,
     notifyEnabled: true,
+    autoRefreshEnabled: true, // 是否开启定时自动刷新
+    autoRefreshMinutes: 10,   // 自动刷新间隔（分钟，默认 10）
     snapshotHour: 14,
     snapshotMinute: 0
   },

@@ -471,11 +471,44 @@ html, body {
   flex-shrink: 0;
 }
 
+.nav-tools .btn {
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.nav-tools .btn-icon-only,
+.btn-sm.btn-icon-only {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: var(--radius-sm);
+}
+
 .nav-sub-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.nav-sub-bar .btn-signal-pill,
+.nav-sub-bar .snapshot-pill {
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
 }
 
 .nav-actions {
@@ -537,33 +570,76 @@ html, body {
   border-radius: var(--radius-sm);
 }
 
-/* 14:00 巡检状态指示小胶囊 */
+/* 交易状态指示与开盘倒计时小胶囊 */
 .snapshot-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 0 10px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  box-sizing: border-box;
   border-radius: var(--radius-full);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
   background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.25);
   color: var(--color-accent);
   white-space: nowrap;
   word-break: keep-all;
   flex-shrink: 0;
+  line-height: 1;
 }
 
-.snapshot-pill.done {
+.snapshot-pill .pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.snapshot-pill.trading {
   background: rgba(16, 185, 129, 0.12);
   border-color: rgba(16, 185, 129, 0.35);
   color: #10b981;
 }
 
-[data-theme="light"] .snapshot-pill.done {
+.snapshot-pill.trading .pill-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  animation: pulse-green 2s infinite ease-in-out;
+}
+
+.snapshot-pill.closed {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.25);
+  color: var(--text-secondary);
+}
+
+.snapshot-pill.closed .pill-dot {
+  background: #94a3b8;
+  opacity: 0.6;
+}
+
+[data-theme="light"] .snapshot-pill.trading {
   background: rgba(16, 185, 129, 0.1);
   border-color: rgba(5, 150, 105, 0.35);
   color: #059669;
+}
+
+[data-theme="light"] .snapshot-pill.closed {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
 }
 
 /* 买卖信号常驻触发提醒胶囊 */
@@ -1796,9 +1872,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   }
 
   .nav-tools .btn {
-    padding: 6px 10px;
-    font-size: 12px;
+    height: 32px;
     min-height: 32px;
+    max-height: 32px;
+    padding: 0 10px;
+    font-size: 12px;
+    box-sizing: border-box;
+  }
+
+  .nav-tools .btn-icon-only {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    max-height: 32px;
+    padding: 0;
+    box-sizing: border-box;
   }
 
   .nav-sub-bar {

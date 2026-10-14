@@ -8,15 +8,10 @@ const FundNotification = {
   audioCtx: null,
 
   /**
-   * 初始化 14:00 定时监控
-   * @param {Function} onSnapshotTriggered 回调函数，执行行情抓取与信号判断
+   * 初始化通知调度器（已升级为14:00后首次打开应用按需提醒，无需后台常驻定时器）
    */
   initScheduler(onSnapshotTriggered) {
-    this._scheduleNext1400(onSnapshotTriggered);
-    // 每分钟检查一次时间，以防手机休眠或页面隐藏唤醒后错过
-    setInterval(() => {
-      this._checkIf1400Needed(onSnapshotTriggered);
-    }, 60000);
+    // 兼容保留接口，已无需后台强制定时抓取
   },
 
   /**
@@ -38,7 +33,30 @@ const FundNotification = {
   },
 
   /**
-   * 检查今天 14:00 是否已经抓取过
+   * 检查今天 14:00 之后是否已经弹出过交易点预警 Notification
+   */
+  hasNotifiedToday() {
+    try {
+      const record = localStorage.getItem('fund_pyramid_notified_today');
+      return record === this.getTodayDateString();
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
+   * 记录今天已发送过 14:00 后的首访交易点预警 Notification
+   */
+  markNotifiedToday() {
+    try {
+      localStorage.setItem('fund_pyramid_notified_today', this.getTodayDateString());
+    } catch (e) {
+      console.error('[Notification] Failed to save notified state:', e);
+    }
+  },
+
+  /**
+   * 检查今天 14:00 是否已经抓取过 (兼容旧数据)
    */
   hasSnapshotTakenToday() {
     const record = FundStorage.getSnapshotRecord();
@@ -47,7 +65,7 @@ const FundNotification = {
   },
 
   /**
-   * 记录今天 14:00 抓取完成
+   * 记录今天 14:00 抓取完成 (兼容旧数据)
    */
   markSnapshotTakenToday(results = {}) {
     FundStorage.saveSnapshotRecord({
@@ -55,69 +73,6 @@ const FundNotification = {
       timestamp: new Date().toISOString(),
       results: results
     });
-  },
-
-  /**
-   * 计算距离今日或下个交易日 14:00 的毫秒数，并安排一次性定时器
-   */
-  _scheduleNext1400(onSnapshotTriggered) {
-    if (this.timerId) {
-      clearTimeout(this.timerId);
-      this.timerId = null;
-    }
-
-    const now = new Date();
-    const todayStr = this.getTodayDateString(now);
-
-    // 如果今天是交易日
-    if (this.isTradingDay(now)) {
-      const targetToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 14, 0, 0, 0);
-
-      // 如果当前时间已经过了 14:00
-      if (now.getTime() >= targetToday.getTime()) {
-        // 如果今天尚未抓取过 14:00 估值，且在交易时段内（14:00-15:30），立即补抓一次
-        if (!this.hasSnapshotTakenToday() && now.getHours() < 16) {
-          console.log('[Notification] 今日已到 14:00 且尚未抓取，立即执行今日单次抓取');
-          this._executeSnapshot(onSnapshotTriggered);
-        }
-        return;
-      } else {
-        // 今天还没到 14:00，设置精确定时器
-        const delay = targetToday.getTime() - now.getTime();
-        console.log(`[Notification] 已设定定时抓取：距离今天 14:00 还有 ${(delay / 1000 / 60).toFixed(1)} 分钟`);
-        this.timerId = setTimeout(() => {
-          this._executeSnapshot(onSnapshotTriggered);
-        }, delay);
-        return;
-      }
-    }
-  },
-
-  /**
-   * 定期轮询检查（处理页面后台唤醒或跨越 14:00）
-   */
-  _checkIf1400Needed(onSnapshotTriggered) {
-    const now = new Date();
-    if (this.isTradingDay(now)) {
-      if (now.getHours() === 14 && !this.hasSnapshotTakenToday()) {
-        console.log('[Notification] 14:00 定时检查触发：执行今日单次抓取');
-        this._executeSnapshot(onSnapshotTriggered);
-      }
-    }
-  },
-
-  /**
-   * 执行 14:00 单次抓取
-   */
-  async _executeSnapshot(onSnapshotTriggered) {
-    try {
-      this.markSnapshotTakenToday();
-      if (typeof onSnapshotTriggered === 'function') {
-        await onSnapshotTriggered(true); // true 表示是由 14:00 定时巡检触发的
-      }
-    } catch (e) {
-      console.error('[Notification] Snapshot execution failed:', e);
-    }
   },
 
   /**

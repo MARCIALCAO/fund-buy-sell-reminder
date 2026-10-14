@@ -128,6 +128,9 @@
     btnThemeLight: document.getElementById('btnThemeLight'),
     btnColorCn: document.getElementById('btnColorCn'),
     btnColorIntl: document.getElementById('btnColorIntl'),
+    chkAutoRefresh: document.getElementById('chkAutoRefresh'),
+    inputAutoRefreshMinutes: document.getElementById('inputAutoRefreshMinutes'),
+    autoRefreshIntervalRow: document.getElementById('autoRefreshIntervalRow'),
     chkSound: document.getElementById('chkSound'),
     chkNotify: document.getElementById('chkNotify'),
     btnExportJSON: document.getElementById('btnExportJSON'),
@@ -150,7 +153,8 @@
     loadSettings();
     loadFunds();
     bindEvents();
-    init1400Scheduler();
+    initMarketStatusTimer();
+    restartAutoRefresh();
     await refreshData(false);
   }
 
@@ -163,6 +167,15 @@
     applyColorMode(currentSettings.colorMode);
     elements.chkSound.checked = !!currentSettings.soundEnabled;
     elements.chkNotify.checked = !!currentSettings.notifyEnabled;
+    if (elements.chkAutoRefresh) {
+      elements.chkAutoRefresh.checked = currentSettings.autoRefreshEnabled !== false;
+    }
+    if (elements.inputAutoRefreshMinutes) {
+      elements.inputAutoRefreshMinutes.value = currentSettings.autoRefreshMinutes || 10;
+    }
+    if (elements.autoRefreshIntervalRow) {
+      elements.autoRefreshIntervalRow.style.display = (currentSettings.autoRefreshEnabled !== false) ? 'flex' : 'none';
+    }
   }
 
   function applyTheme(theme) {
@@ -184,44 +197,97 @@
     currentFunds = FundStorage.getFunds();
   }
 
-  /**
-   * 初始化 14:00 定时抓取调度器（交易日精准一次）
-   */
-  function init1400Scheduler() {
-    updateSnapshotPillUI();
+  let marketStatusTimer = null;
+  let autoRefreshTimer = null;
 
-    FundNotification.initScheduler(async (isScheduled1400) => {
-      console.log('[App] 14:00 定时抓取触发！执行单次拉取与策略分析...');
-      await refreshData(isScheduled1400);
-      updateSnapshotPillUI();
-    });
+  /**
+   * 初始化交易状态与倒计时秒级定时器
+   */
+  function initMarketStatusTimer() {
+    updateMarketStatusPill();
+    if (marketStatusTimer) clearInterval(marketStatusTimer);
+    marketStatusTimer = setInterval(updateMarketStatusPill, 1000);
   }
 
   /**
-   * 更新 14:00 抓取状态小胶囊 UI
+   * 更新交易时段状态与开盘倒计时 UI
    */
-  function updateSnapshotPillUI() {
-    const isTodayDone = FundNotification.hasSnapshotTakenToday();
-    const isTradingDay = FundNotification.isTradingDay();
+  function updateMarketStatusPill() {
+    if (!elements.snapshotStatusPill || !elements.snapshotStatusText) return;
 
-    if (!isTradingDay) {
-      elements.snapshotStatusPill.className = 'snapshot-pill';
-      elements.snapshotStatusText.textContent = '非交易日 (休市)';
-      return;
-    }
+    const now = new Date();
+    const day = now.getDay(); // 0: 周日, 1-5: 周一至周五, 6: 周六
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const s = now.getSeconds();
+    const curSec = h * 3600 + m * 60 + s;
 
-    if (isTodayDone) {
-      elements.snapshotStatusPill.className = 'snapshot-pill done';
-      elements.snapshotStatusText.textContent = '14:00 已抓取快照';
+    const isTradingDay = (day >= 1 && day <= 5);
+    const morningOpen = 9 * 3600 + 30 * 60;   // 09:30:00 = 34200
+    const morningClose = 11 * 3600 + 30 * 60; // 11:30:00 = 41400
+    const afternoonOpen = 13 * 3600;          // 13:00:00 = 46800
+    const afternoonClose = 15 * 3600;         // 15:00:00 = 54000
+
+    const isMorningTrading = isTradingDay && (curSec >= morningOpen && curSec < morningClose);
+    const isAfternoonTrading = isTradingDay && (curSec >= afternoonOpen && curSec < afternoonClose);
+    const isTrading = isMorningTrading || isAfternoonTrading;
+
+    const pad = num => String(num).padStart(2, '0');
+
+    if (isTrading) {
+      elements.snapshotStatusPill.className = 'snapshot-pill trading';
+      elements.snapshotStatusText.textContent = `实时盘中交易时间：${pad(h)}:${pad(m)}:${pad(s)}`;
     } else {
-      const now = new Date();
-      if (now.getHours() < 14) {
-        elements.snapshotStatusPill.className = 'snapshot-pill';
-        elements.snapshotStatusText.textContent = '14:00 待抓取';
+      // 计算距离下次开盘的目标时间
+      let target = new Date(now.getTime());
+
+      if (isTradingDay) {
+        if (curSec < morningOpen) {
+          // 00:00:00 - 09:30:00: 今日早盘开盘
+          target.setHours(9, 30, 0, 0);
+        } else if (curSec >= morningClose && curSec < afternoonOpen) {
+          // 11:30:00 - 13:00:00: 午间休市，今日午盘开盘
+          target.setHours(13, 0, 0, 0);
+        } else {
+          // 15:00:00 之后，如果周五则跳到下周一，否则跳到明天
+          const daysToAdd = (day === 5) ? 3 : 1;
+          target.setDate(target.getDate() + daysToAdd);
+          target.setHours(9, 30, 0, 0);
+        }
       } else {
-        elements.snapshotStatusPill.className = 'snapshot-pill done';
-        elements.snapshotStatusText.textContent = '今日交易已收盘';
+        // 周末：周六加2天到周一，周日加1天到周一
+        const daysToAdd = (day === 6) ? 2 : 1;
+        target.setDate(target.getDate() + daysToAdd);
+        target.setHours(9, 30, 0, 0);
       }
+
+      const diffSec = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000));
+      const countdownH = pad(Math.floor(diffSec / 3600));
+      const countdownM = pad(Math.floor((diffSec % 3600) / 60));
+      const countdownS = pad(diffSec % 60);
+
+      elements.snapshotStatusPill.className = 'snapshot-pill closed';
+      elements.snapshotStatusText.textContent = `距离开盘：${countdownH}:${countdownM}:${countdownS}`;
+    }
+  }
+
+  /**
+   * 重启/启动盘中自动刷新定时器
+   */
+  function restartAutoRefresh() {
+    if (autoRefreshTimer) {
+      clearInterval(autoRefreshTimer);
+      autoRefreshTimer = null;
+    }
+    const settings = FundStorage.getSettings();
+    if (settings.autoRefreshEnabled !== false) {
+      const minutes = Math.max(1, parseInt(settings.autoRefreshMinutes, 10) || 10);
+      autoRefreshTimer = setInterval(async () => {
+        if (currentFunds && currentFunds.length > 0) {
+          console.log(`[AutoRefresh] 执行定时自动刷新 (${minutes} 分钟间隔)...`);
+          await refreshData(false);
+        }
+      }, minutes * 60 * 1000);
     }
   }
 
@@ -924,12 +990,18 @@
         elements.signalAlertItemsContainer.innerHTML = cardsHtml;
       }
 
-      // 如果有未执行信号且是 14:00 定时抓取，触发声音与系统弹窗
-      if (isFrom1400 && unexecutedList.length > 0) {
+      // 14:00 后首次打开网页或应用时，如果检测到未执行交易点，触发提示音与系统 Notification 弹窗
+      const now = new Date();
+      const isTradingDay = FundNotification.isTradingDay(now);
+      const isAfter1400 = now.getHours() >= 14;
+      const alreadyNotified = FundNotification.hasNotifiedToday();
+
+      if (isTradingDay && isAfter1400 && !alreadyNotified && unexecutedList.length > 0) {
         const hasBuy = unexecutedList.some(t => t.type === 'buy');
         FundNotification.playChime(hasBuy ? 'buy' : 'sell');
         const details = unexecutedList.map(t => `${t.name}: 第${t.level}档${t.type === 'buy' ? '加仓' : '减仓'}`).join('；');
         FundNotification.sendSystemNotification('【基金金字塔交易点位预警】', details);
+        FundNotification.markNotifiedToday();
       }
     } else {
       if (elements.btnToggleSignalAlert) {
@@ -1500,6 +1572,29 @@
       currentSettings.soundEnabled = e.target.checked;
       FundStorage.saveSettings(currentSettings);
     });
+
+    if (elements.chkAutoRefresh) {
+      elements.chkAutoRefresh.addEventListener('change', (e) => {
+        currentSettings.autoRefreshEnabled = e.target.checked;
+        if (elements.autoRefreshIntervalRow) {
+          elements.autoRefreshIntervalRow.style.display = e.target.checked ? 'flex' : 'none';
+        }
+        FundStorage.saveSettings(currentSettings);
+        restartAutoRefresh();
+      });
+    }
+
+    if (elements.inputAutoRefreshMinutes) {
+      elements.inputAutoRefreshMinutes.addEventListener('change', (e) => {
+        let val = parseInt(e.target.value, 10);
+        if (isNaN(val) || val < 1) val = 1;
+        if (val > 120) val = 120;
+        e.target.value = val;
+        currentSettings.autoRefreshMinutes = val;
+        FundStorage.saveSettings(currentSettings);
+        restartAutoRefresh();
+      });
+    }
 
     elements.chkNotify.addEventListener('change', async (e) => {
       if (e.target.checked) {
