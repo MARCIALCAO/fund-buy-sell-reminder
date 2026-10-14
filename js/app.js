@@ -2021,10 +2021,21 @@
 
     // 注册 PWA Service Worker (若支持)
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-      navigator.serviceWorker.register('./sw.js').then(() => {
+      navigator.serviceWorker.register('./sw.js').then((reg) => {
         console.log('[PWA] Service Worker 注册就绪');
+        // 页面打开时主动检查服务端是否有更新的 sw.js
+        reg.update();
       }).catch(err => {
         console.log('[PWA] Service Worker 注册跳过:', err);
+      });
+
+      // 当新版本 Service Worker 接管页面时，自动平滑重载页面
+      let isRefreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!isRefreshing) {
+          isRefreshing = true;
+          window.location.reload();
+        }
       });
     }
   });
