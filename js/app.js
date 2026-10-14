@@ -513,7 +513,7 @@
             </div>
 
             <div class="metric-col">
-              <span class="metric-title">累计持有收益 (盈亏率)</span>
+              <span class="metric-title">持有收益 (收益率)</span>
               <span class="metric-number tabular-nums ${pnlRateClass}">
                 ${(item.totalProfit >= 0 ? '+¥' : '-¥') + Math.abs(item.totalProfit).toFixed(2)}
                 <span class="metric-rate-sub">(${pnlRateText})</span>
@@ -1003,9 +1003,10 @@
             const info = await FundAPI.fetchSingleFund(code);
             if (info && info.name) {
               elements.inputFundName.value = info.name;
-              elements.inputCurrentNav.value = info.nav || 1.0;
+              const newNav = parseFloat(info.nav) || 1.0;
+              elements.inputCurrentNav.value = newNav;
               elements.fundQueryStatus.textContent = `最新单位净值: ${info.nav} (${info.navDate || '近期'})`;
-              calcSharesFromAmount();
+              syncNavChanged(newNav);
             } else {
               elements.fundQueryStatus.textContent = '未检索到此基金，可手动填写名称与净值';
             }
@@ -1018,12 +1019,185 @@
       }
     });
 
-    function calcSharesFromAmount() {
-      const nav = parseFloat(elements.inputCurrentNav.value) || 1.0;
-      const amount = parseFloat(elements.inputHoldingAmount.value) || 0;
-      if (amount > 0 && nav > 0 && !elements.inputHoldingShares.value) {
-        elements.inputHoldingShares.placeholder = `约 ${(amount / nav).toFixed(2)} 份`;
+    let isLinking = false;
+    let lastProfitField = 'amount'; // 'amount' | 'rate'
+
+    // 根据持仓金额计算并同步持仓份额
+    function syncFromHoldingAmount() {
+      if (isLinking) return;
+      isLinking = true;
+      try {
+        const nav = parseFloat(elements.inputCurrentNav.value) || 1.0;
+        const amountVal = elements.inputHoldingAmount.value.trim();
+
+        if (amountVal === '') {
+          elements.inputHoldingShares.value = '';
+          if (lastProfitField === 'rate') {
+            elements.inputProfitAmount.value = '';
+          } else {
+            elements.inputProfitRate.value = '';
+          }
+          updateAddModalBenchmarkDefaults('all');
+          return;
+        }
+
+        const amount = parseFloat(amountVal);
+        if (!isNaN(amount) && nav > 0) {
+          elements.inputHoldingShares.value = (amount / nav).toFixed(2);
+        }
+
+        syncProfitFromHoldingChange(amount);
+        updateAddModalBenchmarkDefaults('all');
+      } finally {
+        isLinking = false;
       }
+    }
+
+    // 根据持仓份额计算并同步持仓金额
+    function syncFromHoldingShares() {
+      if (isLinking) return;
+      isLinking = true;
+      try {
+        const nav = parseFloat(elements.inputCurrentNav.value) || 1.0;
+        const sharesVal = elements.inputHoldingShares.value.trim();
+
+        if (sharesVal === '') {
+          elements.inputHoldingAmount.value = '';
+          if (lastProfitField === 'rate') {
+            elements.inputProfitAmount.value = '';
+          } else {
+            elements.inputProfitRate.value = '';
+          }
+          updateAddModalBenchmarkDefaults('all');
+          return;
+        }
+
+        const shares = parseFloat(sharesVal);
+        if (!isNaN(shares) && nav > 0) {
+          const amount = shares * nav;
+          elements.inputHoldingAmount.value = amount.toFixed(2);
+          syncProfitFromHoldingChange(amount);
+        }
+        updateAddModalBenchmarkDefaults('all');
+      } finally {
+        isLinking = false;
+      }
+    }
+
+    // 当持仓金额改变时，保持持有收益或持有收益率联动
+    function syncProfitFromHoldingChange(amount) {
+      if (isNaN(amount) || amount <= 0) return;
+
+      if (lastProfitField === 'rate') {
+        const rateVal = elements.inputProfitRate.value.trim();
+        if (rateVal !== '' && !isNaN(parseFloat(rateVal))) {
+          const rate = parseFloat(rateVal);
+          if (1 + rate / 100 > 0) {
+            const profit = amount * ((rate / 100) / (1 + rate / 100));
+            elements.inputProfitAmount.value = profit.toFixed(2);
+          } else {
+            elements.inputProfitAmount.value = (-amount).toFixed(2);
+          }
+        }
+      } else {
+        const profitVal = elements.inputProfitAmount.value.trim();
+        if (profitVal !== '' && !isNaN(parseFloat(profitVal))) {
+          const profit = parseFloat(profitVal);
+          const principal = amount - profit;
+          if (principal > 0) {
+            elements.inputProfitRate.value = ((profit / principal) * 100).toFixed(2);
+          } else {
+            elements.inputProfitRate.value = '';
+          }
+        }
+      }
+    }
+
+    // 用户编辑持有收益 (元)
+    function syncFromProfitAmount() {
+      if (isLinking) return;
+      isLinking = true;
+      try {
+        lastProfitField = 'amount';
+        const profitVal = elements.inputProfitAmount.value.trim();
+
+        if (profitVal === '') {
+          elements.inputProfitRate.value = '';
+          updateAddModalBenchmarkDefaults('all');
+          return;
+        }
+
+        const profit = parseFloat(profitVal);
+        if (isNaN(profit)) return;
+
+        const amountVal = elements.inputHoldingAmount.value.trim();
+        const amount = parseFloat(amountVal);
+
+        if (!isNaN(amount) && amount > 0) {
+          const principal = amount - profit;
+          if (principal > 0) {
+            const rate = (profit / principal) * 100;
+            elements.inputProfitRate.value = rate.toFixed(2);
+          } else {
+            elements.inputProfitRate.value = '';
+          }
+        }
+        updateAddModalBenchmarkDefaults('all');
+      } finally {
+        isLinking = false;
+      }
+    }
+
+    // 用户编辑持有收益率 (%)
+    function syncFromProfitRate() {
+      if (isLinking) return;
+      isLinking = true;
+      try {
+        lastProfitField = 'rate';
+        const rateVal = elements.inputProfitRate.value.trim();
+
+        if (rateVal === '') {
+          elements.inputProfitAmount.value = '';
+          updateAddModalBenchmarkDefaults('all');
+          return;
+        }
+
+        const rate = parseFloat(rateVal);
+        if (isNaN(rate)) return;
+
+        const amountVal = elements.inputHoldingAmount.value.trim();
+        const amount = parseFloat(amountVal);
+
+        if (!isNaN(amount) && amount > 0) {
+          if (1 + rate / 100 > 0) {
+            const profit = amount * ((rate / 100) / (1 + rate / 100));
+            elements.inputProfitAmount.value = profit.toFixed(2);
+          } else {
+            elements.inputProfitAmount.value = (-amount).toFixed(2);
+          }
+        }
+        updateAddModalBenchmarkDefaults('all');
+      } finally {
+        isLinking = false;
+      }
+    }
+
+    // 当最新单位净值加载或更新时
+    function syncNavChanged(newNav) {
+      if (!newNav || newNav <= 0) return;
+      const amountVal = elements.inputHoldingAmount.value.trim();
+      const sharesVal = elements.inputHoldingShares.value.trim();
+
+      if (amountVal !== '' && !isNaN(parseFloat(amountVal))) {
+        const amount = parseFloat(amountVal);
+        elements.inputHoldingShares.value = (amount / newNav).toFixed(2);
+      } else if (sharesVal !== '' && !isNaN(parseFloat(sharesVal))) {
+        const shares = parseFloat(sharesVal);
+        const amount = shares * newNav;
+        elements.inputHoldingAmount.value = amount.toFixed(2);
+        syncProfitFromHoldingChange(amount);
+      }
+      updateAddModalBenchmarkDefaults('all');
     }
 
     function updateAddModalBenchmarkDefaults(side = 'all') {
@@ -1051,16 +1225,10 @@
       }
     }
 
-    elements.inputHoldingAmount.addEventListener('input', () => {
-      calcSharesFromAmount();
-      updateAddModalBenchmarkDefaults('all');
-    });
-    elements.inputHoldingShares.addEventListener('input', () => {
-      updateAddModalBenchmarkDefaults('all');
-    });
-    elements.inputProfitAmount.addEventListener('input', () => {
-      updateAddModalBenchmarkDefaults('all');
-    });
+    elements.inputHoldingAmount.addEventListener('input', syncFromHoldingAmount);
+    elements.inputHoldingShares.addEventListener('input', syncFromHoldingShares);
+    elements.inputProfitAmount.addEventListener('input', syncFromProfitAmount);
+    elements.inputProfitRate.addEventListener('input', syncFromProfitRate);
 
     if (elements.selectBuyAnchorMode) {
       elements.selectBuyAnchorMode.addEventListener('change', () => {
@@ -1268,6 +1436,7 @@
     elements.selectSellAnchorMode.value = 'initialCost';
     elements.inputSellBenchmarkPrice.value = '1.0000';
     elements.inputPlannedAmount.value = '15000';
+    lastProfitField = 'amount';
     openModal(elements.modalAddFund);
     elements.inputFundCode.focus();
   }
@@ -1297,6 +1466,7 @@
     elements.inputProfitAmount.value = totalProfit.toFixed(2);
     const profitRate = fund.totalCost > 0 ? (totalProfit / fund.totalCost) * 100 : 0;
     elements.inputProfitRate.value = profitRate.toFixed(2);
+    lastProfitField = 'amount';
 
     elements.inputPlannedAmount.value = fund.plannedAmount || 15000;
 

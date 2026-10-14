@@ -23,10 +23,10 @@ const FundStrategy = {
    * @param {Object} input
    *  - code: 基金代码
    *  - name: 基金名称
-   *  - holdingAmount: 用户输入的当前持有金额（元），与 holdingShares 二选一
-   *  - holdingShares: 用户输入的当前持有份额（份）
-   *  - profitAmount: 用户输入的当前累计盈亏（元），与 profitRate 二选一
-   *  - profitRate: 用户输入的当前盈亏率（%，如 5.5 表示 +5.5%）
+   *  - holdingAmount: 用户输入的当前持有金额（元），与 holdingShares 联动
+   *  - holdingShares: 用户输入的当前持有份额（份），与 holdingAmount 联动
+   *  - profitAmount: 用户输入的持有收益（元），与 profitRate 联动
+   *  - profitRate: 用户输入的持有收益率（%，如 5.5 表示 +5.5%）
    *  - currentNav: 当前最新单位净值 (NAV)
    *  - plannedAmount: 计划总投入预算（元）
    *  - buyAnchorMode: 买入基准模式
@@ -39,23 +39,33 @@ const FundStrategy = {
     let shares = 0;
     let holdingAmount = 0;
 
-    if (input.holdingShares !== undefined && input.holdingShares !== null && input.holdingShares !== '') {
+    const hasShares = input.holdingShares !== undefined && input.holdingShares !== null && input.holdingShares !== '';
+    const hasAmount = input.holdingAmount !== undefined && input.holdingAmount !== null && input.holdingAmount !== '';
+
+    if (hasShares && hasAmount) {
       shares = parseFloat(input.holdingShares) || 0;
-      holdingAmount = shares * currentNav;
+      holdingAmount = parseFloat(input.holdingAmount) || 0;
+    } else if (hasShares) {
+      shares = parseFloat(input.holdingShares) || 0;
+      holdingAmount = currentNav > 0 ? shares * currentNav : 0;
     } else {
       holdingAmount = parseFloat(input.holdingAmount) || 0;
       shares = currentNav > 0 ? holdingAmount / currentNav : 0;
     }
 
     let profit = 0;
-    if (input.profitAmount !== undefined && input.profitAmount !== null && input.profitAmount !== '') {
+    const hasProfitAmount = input.profitAmount !== undefined && input.profitAmount !== null && input.profitAmount !== '';
+    const hasProfitRate = input.profitRate !== undefined && input.profitRate !== null && input.profitRate !== '';
+
+    if (hasProfitAmount) {
       profit = parseFloat(input.profitAmount) || 0;
-    } else if (input.profitRate !== undefined && input.profitRate !== null && input.profitRate !== '') {
+    } else if (hasProfitRate) {
       const rate = parseFloat(input.profitRate) || 0;
-      // profit = holdingAmount - holdingAmount / (1 + rate / 100)
       if (rate !== -100) {
         const cost = holdingAmount / (1 + rate / 100);
         profit = holdingAmount - cost;
+      } else {
+        profit = -holdingAmount;
       }
     }
 
