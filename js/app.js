@@ -830,8 +830,12 @@
         if (elements.signalBadgeText) {
           if (unexecutedList.length > 0) {
             elements.signalBadgeText.textContent = `${unexecutedList.length} 笔买卖待执行`;
+            elements.btnToggleSignalAlert.classList.remove('all-done');
+            elements.btnToggleSignalAlert.classList.add('pending');
           } else {
             elements.signalBadgeText.textContent = `今日买卖已全部执行 (${executedList.length})`;
+            elements.btnToggleSignalAlert.classList.remove('pending');
+            elements.btnToggleSignalAlert.classList.add('all-done');
           }
         }
       }
@@ -930,6 +934,7 @@
     } else {
       if (elements.btnToggleSignalAlert) {
         elements.btnToggleSignalAlert.style.display = 'none';
+        elements.btnToggleSignalAlert.classList.remove('pending', 'all-done');
       }
       elements.signalAlertBanner.classList.remove('active');
       isAlertBannerHiddenByUser = false;

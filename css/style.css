@@ -55,23 +55,187 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* 浅色主题支持 */
+/* 浅色主题支持 (纯白高透亮卡片、超高清晰度与对比度) */
 [data-theme="light"] {
-  --bg-primary: #f1f5f9;
-  --bg-secondary: rgba(255, 255, 255, 0.78);
-  --bg-card: rgba(255, 255, 255, 0.65);
-  --bg-card-hover: rgba(255, 255, 255, 0.9);
-  --bg-input: rgba(248, 250, 252, 0.9);
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #ffffff;
+  --bg-input: #ffffff;
 
-  --border-glass: rgba(0, 0, 0, 0.06);
-  --border-glass-bright: rgba(0, 0, 0, 0.12);
+  --border-glass: rgba(0, 0, 0, 0.08);
+  --border-glass-bright: rgba(0, 0, 0, 0.16);
+  --border-focus: #2563eb;
 
   --text-primary: #0f172a;
-  --text-secondary: #475569;
+  --text-secondary: #334155;
   --text-muted: #64748b;
   --text-dim: #94a3b8;
 
-  --shadow-glass: 0 8px 28px 0 rgba(0, 0, 0, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+  --shadow-glass: 0 4px 20px 0 rgba(0, 0, 0, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  --shadow-popup: 0 20px 48px 0 rgba(0, 0, 0, 0.14), 0 2px 6px 0 rgba(0, 0, 0, 0.04);
+}
+
+/* 浅色主题微结构优化 (彻底清除发灰、发暗的深色遮罩，保证极简明朗) */
+[data-theme="light"] .glass-panel {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .ambient-glow {
+  opacity: 0.35;
+}
+
+[data-theme="light"] .fund-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 18px 0 rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .fund-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 24px 0 rgba(0, 0, 0, 0.07);
+}
+
+[data-theme="light"] .fund-metrics-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .metric-col {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .metric-col:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .metric-title {
+  color: #64748b;
+}
+
+[data-theme="light"] .metric-number {
+  color: #0f172a;
+}
+
+[data-theme="light"] .metrics-divider::before,
+[data-theme="light"] .metrics-divider::after {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .divider-text {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .ladder-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .action-pill {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .tier-bar {
+  background: #e2e8f0;
+}
+
+[data-theme="light"] .fund-card-actions {
+  border-top-color: #e2e8f0;
+}
+
+[data-theme="light"] .btn {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+[data-theme="light"] .btn-primary {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #ffffff;
+  border: none;
+}
+
+[data-theme="light"] .alert-banner {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.06), rgba(245, 158, 11, 0.06));
+  border-color: rgba(239, 68, 68, 0.25);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.06);
+}
+
+[data-theme="light"] .signal-alert-card {
+  background: #ffffff;
+  border-color: rgba(239, 68, 68, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .timeline-track::before {
+  background: #e2e8f0;
+}
+
+[data-theme="light"] .timeline-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .timeline-card:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .timeline-card.is-latest-card {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
+}
+
+[data-theme="light"] .timeline-btn-edit {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-select {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .modal-content {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .modal-footer {
+  border-top-color: #e2e8f0;
+}
+
+[data-theme="light"] .nav-sub-bar {
+  border-top-color: #e2e8f0;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* 国际配色模式 (绿涨红跌) */
@@ -378,31 +542,81 @@ html, body {
 }
 
 .snapshot-pill.done {
-  background: var(--color-down-bg);
-  border-color: var(--color-down-border);
-  color: var(--color-down);
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #10b981;
+}
+
+[data-theme="light"] .snapshot-pill.done {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(5, 150, 105, 0.35);
+  color: #059669;
 }
 
 /* 买卖信号常驻触发提醒胶囊 */
 .btn-signal-pill {
-  background: rgba(239, 68, 68, 0.16) !important;
-  border-color: rgba(239, 68, 68, 0.45) !important;
-  color: var(--color-up) !important;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
   white-space: nowrap;
   word-break: keep-all;
   flex-shrink: 0;
+  border-radius: var(--radius-sm);
 }
 
-.btn-signal-pill:hover {
-  background: rgba(239, 68, 68, 0.28) !important;
+/* 待执行买卖状态：统一警示红（深色模式与浅色模式各自适配最佳对比度） */
+.btn-signal-pill,
+.btn-signal-pill.pending {
+  background: rgba(239, 68, 68, 0.16) !important;
+  border: 1px solid rgba(239, 68, 68, 0.45) !important;
+  color: #ef4444 !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
+}
+
+.btn-signal-pill:hover,
+.btn-signal-pill.pending:hover {
+  background: rgba(239, 68, 68, 0.26) !important;
   transform: translateY(-1px);
+}
+
+[data-theme="light"] .btn-signal-pill,
+[data-theme="light"] .btn-signal-pill.pending {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(220, 38, 38, 0.35) !important;
+  color: #dc2626 !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.1);
+}
+
+[data-theme="light"] .btn-signal-pill:hover,
+[data-theme="light"] .btn-signal-pill.pending:hover {
+  background: rgba(239, 68, 68, 0.18) !important;
+}
+
+/* 全部已执行状态：统一圆满绿 */
+.btn-signal-pill.all-done {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border: 1px solid rgba(16, 185, 129, 0.45) !important;
+  color: #10b981 !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+}
+
+.btn-signal-pill.all-done:hover {
+  background: rgba(16, 185, 129, 0.26) !important;
+  transform: translateY(-1px);
+}
+
+[data-theme="light"] .btn-signal-pill.all-done {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(5, 150, 105, 0.35) !important;
+  color: #059669 !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+}
+
+[data-theme="light"] .btn-signal-pill.all-done:hover {
+  background: rgba(16, 185, 129, 0.18) !important;
 }
 
 .pill-dot {
@@ -485,6 +699,30 @@ html, body {
   flex-shrink: 0;
 }
 
+.btn-alert-copy {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .btn-alert-copy {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.btn-alert-close {
+  background: rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid var(--border-glass) !important;
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="light"] .btn-alert-close {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+}
+
 /* 动态买卖操作卡片列表 */
 .signal-alert-items-container {
   display: flex;
@@ -506,10 +744,10 @@ html, body {
   transition: all 0.25s ease;
 }
 
-/* 成功执行加减仓提醒：绿色背景与绿色边框 */
+/* 成功执行加减仓提醒：绿色背景与绿色边框 (统一成功状态色，杜绝跨模式色彩倒错) */
 .signal-alert-card.executed {
-  background: var(--color-down-bg) !important;
-  border-color: var(--color-down-border) !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
   box-shadow: 0 0 14px rgba(16, 185, 129, 0.15);
 }
 
@@ -551,10 +789,16 @@ html, body {
 }
 
 .signal-alert-badge.badge-executed {
-  background: rgba(16, 185, 129, 0.25);
-  color: var(--color-down);
-  border: 1px solid var(--color-down-border);
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
   font-weight: 700;
+}
+
+[data-theme="light"] .signal-alert-badge.badge-executed {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border-color: rgba(5, 150, 105, 0.35);
 }
 
 .signal-alert-fund-name {
@@ -584,7 +828,7 @@ html, body {
   color: #fff !important;
   font-weight: 700;
   border: none !important;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 2px 8px var(--color-down-border);
 }
 
 .btn-action-buy:hover {
@@ -597,7 +841,7 @@ html, body {
   color: #fff !important;
   font-weight: 700;
   border: none !important;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 2px 8px var(--color-up-border);
 }
 
 .btn-action-sell:hover {
@@ -611,11 +855,17 @@ html, body {
   gap: 4px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-down);
+  color: #10b981;
   padding: 4px 10px;
   border-radius: var(--radius-sm);
   background: rgba(16, 185, 129, 0.15);
-  border: 1px solid var(--color-down-border);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+[data-theme="light"] .signal-executed-tag {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(5, 150, 105, 0.3);
 }
 
 /* ==========================================================================
@@ -990,12 +1240,12 @@ html, body {
 
 .tier-bar.active-buy {
   background: var(--color-down);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 10px var(--color-down);
 }
 
 .tier-bar.active-sell {
   background: var(--color-up);
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 10px var(--color-up);
 }
 
 /* 基准区间常亮：刻度槽绿色常亮高亮 */
@@ -1240,13 +1490,13 @@ html, body {
 .timeline-dot.dot-buy,
 .timeline-dot.dot-buy_alert {
   background: var(--color-down);
-  --pulse-color: rgba(16, 185, 129, 0.85);
+  --pulse-color: var(--color-down);
 }
 
 .timeline-dot.dot-sell,
 .timeline-dot.dot-sell_alert {
   background: var(--color-up);
-  --pulse-color: rgba(239, 68, 68, 0.85);
+  --pulse-color: var(--color-up);
 }
 
 .timeline-dot.dot-pending {
