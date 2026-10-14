@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   const { codes, FCODES } = req.query;
   const targetCodes = codes || FCODES || '161725';
-  const fields = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE';
+  const fields = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE,NAVCHGRT';
 
   const targetUrl = `https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast?FCODES=${encodeURIComponent(targetCodes)}&FIELDS=${fields}`;
 

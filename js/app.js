@@ -365,6 +365,29 @@
   }
 
   /**
+   * 格式化估值时间（附带 MM-DD 日期，应对半夜 24:00 后、次日开盘前或非交易日场景）
+   * @param {string} gzTime 如 "2026-10-14 15:00"
+   * @param {string} navDate 如 "2026-10-14"
+   * @returns {string} 如 "10-14 15:00"
+   */
+  function formatGzTimeWithDate(gzTime, navDate) {
+    if (gzTime && gzTime.includes(' ')) {
+      const parts = gzTime.split(' ');
+      const datePart = parts[0].length > 5 ? parts[0].slice(5) : parts[0];
+      const timePart = parts[1].length >= 5 ? parts[1].slice(0, 5) : parts[1];
+      return `${datePart} ${timePart}`;
+    }
+    if (gzTime && gzTime.includes('-')) {
+      return gzTime.length > 5 ? gzTime.slice(5) : gzTime;
+    }
+    if (navDate) {
+      const shortD = navDate.length > 5 ? navDate.slice(5) : navDate;
+      return `${shortD} 15:00`;
+    }
+    return '';
+  }
+
+  /**
    * 渲染资产总览卡片 (Summary)
    * 严格按照官方公布正式净值计算持仓市值与累计收益
    */
@@ -373,7 +396,7 @@
     let totalCost = 0;
     let totalPlannedBudget = 0;
     let totalTodayEstimatedProfit = 0;
-    let latestUpdateTime = '--:--';
+    let latestRawGzTime = '';
 
     analyses.forEach(item => {
       totalMarketValue += item.marketValue; // 按正式 NAV 计算的市值
@@ -381,10 +404,13 @@
       const fund = currentFunds.find(f => f.id === item.fundId);
       if (fund) totalPlannedBudget += (fund.plannedAmount || 0);
       totalTodayEstimatedProfit += item.todayEstimatedProfit;
-      if (item.gzTime && item.gzTime > latestUpdateTime) {
-        latestUpdateTime = item.gzTime.split(' ')[1] || item.gzTime;
+      const itemGz = item.gzTime || (item.navDate ? `${item.navDate} 15:00` : '');
+      if (itemGz && itemGz > latestRawGzTime) {
+        latestRawGzTime = itemGz;
       }
     });
+
+    const latestUpdateTime = formatGzTimeWithDate(latestRawGzTime) || '--:--';
 
     // 累计盈亏以总投入成本为基准
     const totalProfit = totalMarketValue - totalCost;
@@ -403,7 +429,7 @@
     elements.sumTotalProfit.className = `summary-value tabular-nums ${totalProfit >= 0 ? 'text-up' : 'text-down'}`;
     elements.sumProfitRate.className = `summary-sub tabular-nums ${profitRate >= 0 ? 'text-up' : 'text-down'}`;
 
-    // 今日盘中预估浮动
+    // 今日盘中预估/实际浮动
     elements.sumTodayProfit.textContent = (totalTodayEstimatedProfit >= 0 ? '+¥' : '-¥') + Math.abs(totalTodayEstimatedProfit).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     elements.sumTodayProfit.className = `summary-value tabular-nums ${totalTodayEstimatedProfit >= 0 ? 'text-up' : 'text-down'}`;
     elements.sumLastUpdated.textContent = `估值时间: ${latestUpdateTime}`;
@@ -493,8 +519,9 @@
 
       const sharesFormatted = (Number(item.shares) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const shortNavDate = item.navDate ? (item.navDate.length > 5 ? item.navDate.slice(5) : item.navDate) : '';
-      const timeOnly = item.gzTime ? (item.gzTime.includes(' ') ? item.gzTime.split(' ')[1] : item.gzTime) : '';
-      const gzTimeDisplay = item.hasValuation ? `${timeOnly} 估值` : '收盘净值计';
+      const formattedGzTime = formatGzTimeWithDate(item.gzTime, item.navDate);
+      const gzTimeDisplay = formattedGzTime ? `${formattedGzTime} 估值` : '收盘净值计';
+      const isOfficial = !!item.isOfficialPublished;
 
       card.innerHTML = `
         <div class="fund-header">
@@ -510,7 +537,7 @@
           </div>
           <div class="fund-rate-group">
             <div class="fund-rate-badge ${rateClass} tabular-nums">
-              <span class="rate-label">今日预估</span>
+              <span class="rate-label">${isOfficial ? '今日实际' : '今日预估'}</span>
               <span>${rateText}</span>
             </div>
             <span class="fund-gz-time">${gzTimeDisplay}</span>
@@ -553,14 +580,14 @@
           <!-- 第二行：盘中估值、浮动与成本基准 -->
           <div class="metrics-row">
             <div class="metric-col">
-              <span class="metric-title">盘中参考估值</span>
+              <span class="metric-title">${isOfficial ? '收盘确认净值' : '盘中参考估值'}</span>
               <span class="metric-number tabular-nums">
                 ${item.hasValuation ? '¥' + item.gsz.toFixed(4) : '以净值计'}
               </span>
             </div>
 
             <div class="metric-col">
-              <span class="metric-title">今日预估浮动</span>
+              <span class="metric-title">${isOfficial ? '今日实际收益' : '今日预估浮动'}</span>
               <span class="metric-number tabular-nums ${item.todayEstimatedProfit >= 0 ? 'text-up' : 'text-down'}">
                 ${(item.todayEstimatedProfit >= 0 ? '+¥' : '-¥') + Math.abs(item.todayEstimatedProfit).toFixed(2)}
               </span>

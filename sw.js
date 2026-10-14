@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fund-pyramid-v2.7';
+const CACHE_NAME = 'fund-pyramid-v2.8';
 const STATIC_ASSETS = [
   './',
   './index.html',

@@ -18,7 +18,7 @@ const FundAPI = {
     if (!codes || codes.length === 0) return {};
     const cleanCodes = codes.map(c => String(c).trim()).filter(Boolean);
     const codeStr = cleanCodes.join(',');
-    const fields = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE';
+    const fields = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE,NAVCHGRT';
 
     // 尝试策略 1: 直接请求（接口支持 CORS * 通配）
     try {
@@ -131,20 +131,54 @@ const FundAPI = {
       if (!item || !item.FCODE) continue;
       const code = String(item.FCODE);
       const nav = typeof item.NAV === 'number' ? item.NAV : parseFloat(item.NAV) || null;
-      const gsz = typeof item.GSZ === 'number' ? item.GSZ : parseFloat(item.GSZ) || null;
-      const gszzl = typeof item.GSZZL === 'number' ? item.GSZZL : parseFloat(item.GSZZL) || 0;
+      let gsz = typeof item.GSZ === 'number' ? item.GSZ : parseFloat(item.GSZ) || null;
+      let gszzl = typeof item.GSZZL === 'number' ? item.GSZZL : parseFloat(item.GSZZL) || null;
+      const navchgrt = typeof item.NAVCHGRT === 'number' ? item.NAVCHGRT : parseFloat(item.NAVCHGRT) || null;
+      let gzTime = item.GZTIME || '';
+      const navDate = item.PDATE || '';
+
+      // 提取估值时间中的日期（例如 "2026-10-14 15:00" -> "2026-10-14"）
+      const gzDate = gzTime ? (gzTime.includes(' ') ? gzTime.split(' ')[0] : (gzTime.length === 10 ? gzTime : '')) : '';
+
+      // 判断当日官方正式净值是否已公布：
+      // 1. 如果有估值日期，且 navDate >= gzDate，说明官方公布的净值日期已赶上或超过该估值日（通常在晚上或次日早晨）
+      // 2. 如果 GZTIME/GSZ 为空或 null（天天基金晚上正式清算后估值数据清空），只要 nav 和 navDate 有效，即表示已为正式净值
+      let isOfficialPublished = false;
+      if (nav !== null && !isNaN(nav) && navDate) {
+        if (gzDate) {
+          if (navDate >= gzDate) {
+            isOfficialPublished = true;
+          }
+        } else {
+          isOfficialPublished = true;
+        }
+      }
+
+      // 当到了晚上抓取到的基金净值更新为当日正式净值之后，最后收盘时的净值预估值要改为正式的净值
+      if (isOfficialPublished && nav !== null && !isNaN(nav)) {
+        gsz = nav; // 收盘预估净值自动校准为官方正式净值
+        if (navchgrt !== null && !isNaN(navchgrt)) {
+          gszzl = navchgrt; // 采用官方公布的实际涨跌幅
+        }
+        if (!gzTime && navDate) {
+          gzTime = `${navDate} 15:00`;
+        }
+      }
+
+      const hasValuation = (gsz !== null && !isNaN(gsz)) || (nav !== null && !isNaN(nav));
+      const currentPrice = (gsz !== null && !isNaN(gsz)) ? gsz : nav;
 
       result[code] = {
         code: code,
         name: item.SHORTNAME || '未知基金',
-        nav: nav, // 上一个交易日净值
-        navDate: item.PDATE || '', // 净值日期
-        gsz: gsz, // 今日估值（部分基金盘中无估值则为 null）
-        gszzl: gszzl, // 估值涨跌幅（%）
-        gzTime: item.GZTIME || '', // 估值更新时间
-        // 当前用于计算的参考最新价（优先用今日估值，没有则用上一净值）
-        currentPrice: (gsz !== null && !isNaN(gsz)) ? gsz : nav,
-        hasValuation: gsz !== null && !isNaN(gsz)
+        nav: nav, // 官方最新公布净值
+        navDate: navDate, // 净值日期
+        gsz: gsz !== null ? gsz : nav, // 预估净值（已收盘公布正式净值则为正式净值）
+        gszzl: gszzl !== null ? gszzl : (navchgrt || 0), // 涨跌幅（%）
+        gzTime: gzTime, // 估值更新时间（包含完整日期时间）
+        isOfficialPublished: isOfficialPublished, // 是否已为当日正式净值
+        currentPrice: currentPrice, // 当前用于阶梯计算的最新价格
+        hasValuation: hasValuation
       };
     }
     return result;

@@ -124,15 +124,30 @@ const FundStrategy = {
     const gszzl = valuation ? valuation.gszzl : 0;
     const gzTime = valuation ? valuation.gzTime : '';
     const hasValuation = valuation ? valuation.hasValuation : false;
+    const isOfficialPublished = valuation ? !!valuation.isOfficialPublished : false;
 
     // 持仓市值与累计盈亏（严格按照正式公布的官方净值 NAV 计算）
     const marketValue = fund.shares * officialNav;
     const totalProfit = marketValue - fund.totalCost;
     const profitRate = fund.totalCost > 0 ? (totalProfit / fund.totalCost) * 100 : 0;
 
-    // 今日预估浮动盈亏（元）（基于盘中实时估值相比上一净值的变动）
+    // 今日预估/实际浮动盈亏（元）
     const todayChangePercent = gszzl || 0;
-    const todayEstimatedProfit = hasValuation ? (fund.shares * officialNav * (todayChangePercent / 100)) : 0;
+    let todayEstimatedProfit = 0;
+    if (hasValuation) {
+      if (isOfficialPublished) {
+        // 当日官方正式净值已公布：基于官方实际涨跌幅推导前一日基准净值，计算今日收益
+        const prevNav = (todayChangePercent !== -100) ? (officialNav / (1 + todayChangePercent / 100)) : officialNav;
+        todayEstimatedProfit = fund.shares * (officialNav - prevNav);
+      } else {
+        // 盘中交易时段：基于今日盘中估值相比上一日净值的变动
+        if (gsz !== null && !isNaN(gsz)) {
+          todayEstimatedProfit = fund.shares * (gsz - officialNav);
+        } else {
+          todayEstimatedProfit = fund.shares * officialNav * (todayChangePercent / 100);
+        }
+      }
+    }
 
     // 1. 确定买入基准价格
     const buyAnchorMode = fund.buyAnchorMode || fund.anchorMode || 'initialCost';
@@ -276,6 +291,7 @@ const FundStrategy = {
       gszzl: gszzl,               // 估值涨跌幅 %
       gzTime: gzTime,
       hasValuation: hasValuation,
+      isOfficialPublished: isOfficialPublished,
       shares: fund.shares,
       totalCost: fund.totalCost,
       avgCost: fund.avgCost,

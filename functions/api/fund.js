@@ -6,7 +6,7 @@
 export async function onRequest(context) {
   const url = new URL(context.request.url);
   const codes = url.searchParams.get('codes') || url.searchParams.get('FCODES') || '161725';
-  const fields = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE';
+  const fields = 'FCODE,SHORTNAME,GSZZL,GZTIME,GSZ,NAV,PDATE,NAVCHGRT';
 
   const targetUrl = `https://fundcomapi.tiantianfunds.com/mm/newCore/FundValuationLast?FCODES=${encodeURIComponent(codes)}&FIELDS=${fields}`;
 
