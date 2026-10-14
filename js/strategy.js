@@ -12,7 +12,9 @@ const FundStrategy = {
       { step: 3, percent: 15, buyRatio: 30, sellRatio: 30 },
       { step: 4, percent: 20, buyRatio: 40, sellRatio: 40 }
     ],
-    anchorMode: 'initialCost', // 'initialCost' (默认初始成本价) | 'avgCost' (持仓均价) | 'lastTrade' (最新成交价)
+    buyAnchorMode: 'initialCost',  // 买入基准: 'initialCost' | 'fixedCost' | 'lastTrade' | 'avgCost'
+    sellAnchorMode: 'initialCost', // 卖出基准: 'initialCost' | 'fixedCost' | 'lastTrade' | 'avgCost'
+    anchorMode: 'initialCost',     // 兼容字段
     plannedAmount: 10000 // 默认计划总投入金额（元）
   },
 
@@ -27,7 +29,10 @@ const FundStrategy = {
    *  - profitRate: 用户输入的当前盈亏率（%，如 5.5 表示 +5.5%）
    *  - currentNav: 当前最新单位净值 (NAV)
    *  - plannedAmount: 计划总投入预算（元）
-   *  - anchorMode: 基准锚点模式
+   *  - buyAnchorMode: 买入基准模式
+   *  - buyBenchmarkPrice: 买入基准价格
+   *  - sellAnchorMode: 卖出基准模式
+   *  - sellBenchmarkPrice: 卖出基准价格
    */
   createInitialPosition(input) {
     const currentNav = parseFloat(input.currentNav) || 1.0;
@@ -57,6 +62,11 @@ const FundStrategy = {
     const totalCost = Math.max(0, holdingAmount - profit);
     const unitCost = shares > 0 ? totalCost / shares : currentNav;
 
+    const buyAnchorMode = input.buyAnchorMode || input.anchorMode || this.DEFAULT_CONFIG.buyAnchorMode;
+    const sellAnchorMode = input.sellAnchorMode || input.anchorMode || this.DEFAULT_CONFIG.sellAnchorMode;
+    const buyBenchmarkPrice = (input.buyBenchmarkPrice !== undefined && input.buyBenchmarkPrice !== null && input.buyBenchmarkPrice !== '') ? parseFloat(input.buyBenchmarkPrice) : unitCost;
+    const sellBenchmarkPrice = (input.sellBenchmarkPrice !== undefined && input.sellBenchmarkPrice !== null && input.sellBenchmarkPrice !== '') ? parseFloat(input.sellBenchmarkPrice) : unitCost;
+
     return {
       id: 'fund_' + String(input.code) + '_' + Date.now(),
       code: String(input.code).trim(),
@@ -67,10 +77,15 @@ const FundStrategy = {
       initialCost: unitCost, // 初始建仓成本价（默认锚点）
       lastTradePrice: unitCost, // 最新交易价
       plannedAmount: parseFloat(input.plannedAmount) || this.DEFAULT_CONFIG.plannedAmount,
-      anchorMode: input.anchorMode || this.DEFAULT_CONFIG.anchorMode,
+      buyAnchorMode: buyAnchorMode,
+      buyBenchmarkPrice: buyBenchmarkPrice,
+      sellAnchorMode: sellAnchorMode,
+      sellBenchmarkPrice: sellBenchmarkPrice,
+      anchorMode: buyAnchorMode, // 兼容历史字段
       stepPercent: parseFloat(input.stepPercent) || this.DEFAULT_CONFIG.stepPercent,
       tiers: input.tiers || JSON.parse(JSON.stringify(this.DEFAULT_CONFIG.tiers)),
       createdAt: new Date().toISOString(),
+      alertHistory: input.alertHistory || [],
       trades: [
         {
           id: 'trade_init_' + Date.now(),
@@ -79,7 +94,8 @@ const FundStrategy = {
           amount: totalCost,
           shares: shares,
           price: unitCost,
-          remark: '初始建仓/录入'
+          remark: '初始建仓/录入',
+          timestamp: Date.now()
         }
       ]
     };
@@ -108,19 +124,48 @@ const FundStrategy = {
     const todayChangePercent = gszzl || 0;
     const todayEstimatedProfit = hasValuation ? (fund.shares * officialNav * (todayChangePercent / 100)) : 0;
 
-    // 确定基准锚点价格
-    let basePrice = fund.initialCost;
-    if (fund.anchorMode === 'avgCost') {
-      basePrice = fund.avgCost;
-    } else if (fund.anchorMode === 'lastTrade') {
-      basePrice = fund.lastTradePrice || fund.avgCost;
+    // 1. 确定买入基准价格
+    const buyAnchorMode = fund.buyAnchorMode || fund.anchorMode || 'initialCost';
+    let buyBasePrice = (fund.buyBenchmarkPrice !== undefined && fund.buyBenchmarkPrice !== null && !isNaN(fund.buyBenchmarkPrice) && Number(fund.buyBenchmarkPrice) > 0) ? Number(fund.buyBenchmarkPrice) : fund.initialCost;
+    if (buyAnchorMode === 'avgCost') {
+      buyBasePrice = fund.avgCost;
+    } else if (buyAnchorMode === 'initialCost') {
+      buyBasePrice = fund.initialCost;
+    } else if (buyAnchorMode === 'lastTrade') {
+      buyBasePrice = fund.lastTradePrice || fund.avgCost || fund.initialCost;
+    } else if (buyAnchorMode === 'fixedCost') {
+      buyBasePrice = (fund.buyBenchmarkPrice && Number(fund.buyBenchmarkPrice) > 0) ? Number(fund.buyBenchmarkPrice) : (fund.initialCost || currentPrice);
     }
-    if (!basePrice || basePrice <= 0) basePrice = currentPrice;
+    if (!buyBasePrice || buyBasePrice <= 0) buyBasePrice = currentPrice;
 
-    // 相对基准价的涨跌偏离度（%）
-    const deviationFromBase = ((currentPrice - basePrice) / basePrice) * 100;
+    // 2. 确定卖出基准价格
+    const sellAnchorMode = fund.sellAnchorMode || fund.anchorMode || 'initialCost';
+    let sellBasePrice = (fund.sellBenchmarkPrice !== undefined && fund.sellBenchmarkPrice !== null && !isNaN(fund.sellBenchmarkPrice) && Number(fund.sellBenchmarkPrice) > 0) ? Number(fund.sellBenchmarkPrice) : fund.initialCost;
+    if (sellAnchorMode === 'avgCost') {
+      sellBasePrice = fund.avgCost;
+    } else if (sellAnchorMode === 'initialCost') {
+      sellBasePrice = fund.initialCost;
+    } else if (sellAnchorMode === 'lastTrade') {
+      sellBasePrice = fund.lastTradePrice || fund.avgCost || fund.initialCost;
+    } else if (sellAnchorMode === 'fixedCost') {
+      sellBasePrice = (fund.sellBenchmarkPrice && Number(fund.sellBenchmarkPrice) > 0) ? Number(fund.sellBenchmarkPrice) : (fund.avgCost || fund.initialCost || currentPrice);
+    }
+    if (!sellBasePrice || sellBasePrice <= 0) sellBasePrice = currentPrice;
 
-    // 计算各阶梯买入点（金字塔：越跌越买）与卖出点（倒金字塔：越涨越卖）
+    const modeDescMap = {
+      initialCost: '建仓价',
+      fixedCost: '固定价',
+      lastTrade: '上次成交',
+      avgCost: '持仓均价'
+    };
+    const buyAnchorDesc = modeDescMap[buyAnchorMode] || '建仓价';
+    const sellAnchorDesc = modeDescMap[sellAnchorMode] || '建仓价';
+
+    // 相对买入基准与卖出基准的涨跌偏离度（%）
+    const buyDeviation = ((currentPrice - buyBasePrice) / buyBasePrice) * 100;
+    const sellDeviation = ((currentPrice - sellBasePrice) / sellBasePrice) * 100;
+
+    // 计算各阶梯买入点（金字塔：基于 buyBasePrice 越跌越买）与卖出点（倒金字塔：基于 sellBasePrice 越涨越卖）
     const tiers = (fund.tiers && fund.tiers.length > 0) ? fund.tiers : this.DEFAULT_CONFIG.tiers;
     const plannedAmount = fund.plannedAmount || this.DEFAULT_CONFIG.plannedAmount;
 
@@ -132,11 +177,11 @@ const FundStrategy = {
     let triggeredBuy = null;
     let triggeredSell = null;
 
-    // 1. 金字塔买入阶梯（跌 5%, 10%, 15%, 20%...）
+    // 1. 金字塔买入阶梯（基于 buyBasePrice 跌 5%, 10%, 15%, 20%...）
     for (let i = 0; i < tiers.length; i++) {
       const tier = tiers[i];
       const targetPercent = tier.percent; // 如 5, 10, 15, 20
-      const triggerPrice = basePrice * (1 - targetPercent / 100);
+      const triggerPrice = buyBasePrice * (1 - targetPercent / 100);
       const buyAmount = (plannedAmount * (tier.buyRatio / 100));
       const estBuyShares = triggerPrice > 0 ? buyAmount / triggerPrice : 0;
 
@@ -166,11 +211,11 @@ const FundStrategy = {
       }
     }
 
-    // 2. 倒金字塔卖出阶梯（涨 5%, 10%, 15%, 20%...）
+    // 2. 倒金字塔卖出阶梯（基于 sellBasePrice 涨 5%, 10%, 15%, 20%...）
     for (let i = 0; i < tiers.length; i++) {
       const tier = tiers[i];
       const targetPercent = tier.percent; // 如 5, 10, 15, 20
-      const triggerPrice = basePrice * (1 + targetPercent / 100);
+      const triggerPrice = sellBasePrice * (1 + targetPercent / 100);
       const sellShares = fund.shares * (tier.sellRatio / 100);
       const estSellAmount = sellShares * triggerPrice;
 
@@ -224,12 +269,20 @@ const FundStrategy = {
       shares: fund.shares,
       totalCost: fund.totalCost,
       avgCost: fund.avgCost,
-      basePrice: basePrice,
+      buyBasePrice: buyBasePrice,
+      sellBasePrice: sellBasePrice,
+      buyAnchorMode: buyAnchorMode,
+      sellAnchorMode: sellAnchorMode,
+      buyAnchorDesc: buyAnchorDesc,
+      sellAnchorDesc: sellAnchorDesc,
+      buyDeviation: buyDeviation,
+      sellDeviation: sellDeviation,
+      basePrice: buyBasePrice, // 兼容字段
+      deviationFromBase: buyDeviation, // 兼容字段
       marketValue: marketValue,
       totalProfit: totalProfit,
       profitRate: profitRate,
       todayEstimatedProfit: todayEstimatedProfit,
-      deviationFromBase: deviationFromBase,
       buyLadders: buyLadders,
       sellLadders: sellLadders,
       nextBuy: nextBuy,
@@ -263,6 +316,12 @@ const FundStrategy = {
     fund.avgCost = newAvgCost;
     fund.lastTradePrice = price;
 
+    // 自动联动更新最新基准价（若选择上一次成交价或持仓均价模式）
+    if (fund.buyAnchorMode === 'lastTrade') fund.buyBenchmarkPrice = price;
+    if (fund.buyAnchorMode === 'avgCost') fund.buyBenchmarkPrice = newAvgCost;
+    if (fund.sellAnchorMode === 'lastTrade') fund.sellBenchmarkPrice = price;
+    if (fund.sellAnchorMode === 'avgCost') fund.sellBenchmarkPrice = newAvgCost;
+
     if (!Array.isArray(fund.trades)) fund.trades = [];
     fund.trades.push({
       id: 'trade_' + Date.now(),
@@ -271,7 +330,12 @@ const FundStrategy = {
       amount: buyAmount,
       shares: boughtShares,
       price: price,
-      remark: tradeRecord.remark || '手动加仓'
+      status: tradeRecord.status || 'confirmed',
+      isEstimated: !!tradeRecord.isEstimated,
+      autoConfirm: tradeRecord.autoConfirm !== undefined ? tradeRecord.autoConfirm : true,
+      targetNavDate: tradeRecord.targetNavDate || tradeRecord.date || new Date().toISOString().split('T')[0],
+      remark: tradeRecord.remark || '手动加仓',
+      timestamp: Date.now()
     });
 
     return fund;
@@ -314,6 +378,12 @@ const FundStrategy = {
     fund.avgCost = newAvgCost;
     fund.lastTradePrice = price;
 
+    // 自动联动更新最新基准价（若选择上一次成交价或持仓均价模式）
+    if (fund.buyAnchorMode === 'lastTrade') fund.buyBenchmarkPrice = price;
+    if (fund.buyAnchorMode === 'avgCost') fund.buyBenchmarkPrice = newAvgCost;
+    if (fund.sellAnchorMode === 'lastTrade') fund.sellBenchmarkPrice = price;
+    if (fund.sellAnchorMode === 'avgCost') fund.sellBenchmarkPrice = newAvgCost;
+
     if (!Array.isArray(fund.trades)) fund.trades = [];
     fund.trades.push({
       id: 'trade_' + Date.now(),
@@ -322,9 +392,70 @@ const FundStrategy = {
       amount: sellAmount,
       shares: sellShares,
       price: price,
+      status: tradeRecord.status || 'confirmed',
+      isEstimated: !!tradeRecord.isEstimated,
+      autoConfirm: tradeRecord.autoConfirm !== undefined ? tradeRecord.autoConfirm : true,
+      targetNavDate: tradeRecord.targetNavDate || tradeRecord.date || new Date().toISOString().split('T')[0],
       realizedProfit: sellAmount - costDeduction,
-      remark: tradeRecord.remark || '手动减仓'
+      remark: tradeRecord.remark || '手动减仓',
+      timestamp: Date.now()
     });
+
+    return fund;
+  },
+
+  /**
+   * 官方正式净值公布后，核准并校准单笔待确认的交易记录（自动更新份额与真实成本）
+   * @param {Object} fund 基金持仓对象
+   * @param {string} tradeId 交易记录ID
+   * @param {number} officialNav 官方正式公布的收盘净值
+   */
+  confirmTrade(fund, tradeId, officialNav) {
+    if (!fund || !Array.isArray(fund.trades) || !officialNav || officialNav <= 0) return fund;
+    const trade = fund.trades.find(t => t.id === tradeId);
+    if (!trade || trade.status === 'confirmed') return fund;
+
+    if (trade.type === 'buy') {
+      const buyAmount = parseFloat(trade.amount) || 0;
+      const oldShares = parseFloat(trade.shares) || 0;
+      const realShares = buyAmount / officialNav;
+      const deltaShares = realShares - oldShares;
+
+      // 更新真实持仓份额（本金不变，份额以官方净值精确计算）
+      fund.shares = Math.max(0, fund.shares + deltaShares);
+      fund.avgCost = fund.shares > 0 ? fund.totalCost / fund.shares : officialNav;
+      fund.lastTradePrice = officialNav;
+
+      // 更新交易明细为已确认
+      trade.status = 'confirmed';
+      trade.isEstimated = false;
+      trade.confirmedNav = officialNav;
+      trade.price = officialNav;
+      trade.shares = realShares;
+      trade.confirmedAt = new Date().toISOString();
+      trade.remark = (trade.remark || '').replace(' (15:00前预估暂记)', '') + ' (已按官方净值确认)';
+
+      // 联动基准价格
+      if (fund.buyAnchorMode === 'lastTrade') fund.buyBenchmarkPrice = officialNav;
+      if (fund.buyAnchorMode === 'avgCost') fund.buyBenchmarkPrice = fund.avgCost;
+      if (fund.sellAnchorMode === 'lastTrade') fund.sellBenchmarkPrice = officialNav;
+      if (fund.sellAnchorMode === 'avgCost') fund.sellBenchmarkPrice = fund.avgCost;
+    } else if (trade.type === 'sell') {
+      const sellShares = parseFloat(trade.shares) || 0;
+      const realAmount = sellShares * officialNav;
+
+      trade.status = 'confirmed';
+      trade.isEstimated = false;
+      trade.confirmedNav = officialNav;
+      trade.price = officialNav;
+      trade.amount = realAmount;
+      trade.confirmedAt = new Date().toISOString();
+      trade.remark = (trade.remark || '').replace(' (15:00前预估暂记)', '') + ' (已按官方净值确认)';
+      fund.lastTradePrice = officialNav;
+
+      if (fund.buyAnchorMode === 'lastTrade') fund.buyBenchmarkPrice = officialNav;
+      if (fund.sellAnchorMode === 'lastTrade') fund.sellBenchmarkPrice = officialNav;
+    }
 
     return fund;
   }

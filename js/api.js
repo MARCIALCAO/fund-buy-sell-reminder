@@ -78,6 +78,49 @@ const FundAPI = {
   },
 
   /**
+   * 拉取单只基金的历史正式净值，匹配目标交易日的官方公布净值
+   * @param {string} code 6位基金代码
+   * @param {string} targetDate 目标日期 "YYYY-MM-DD"
+   * @returns {Promise<number|null>}
+   */
+  async fetchHistoricalNav(code, targetDate) {
+    if (!code || !targetDate) return null;
+    const cleanCode = String(code).trim();
+    const url = `https://api.fund.eastmoney.com/f10/lsjz?fundCode=${encodeURIComponent(cleanCode)}&pageIndex=1&pageSize=20`;
+
+    // 尝试 1: 直接请求
+    try {
+      const res = await this._fetchWithTimeout(url, 4000);
+      if (res && res.Data && Array.isArray(res.Data.LSJZList)) {
+        const found = res.Data.LSJZList.find(item => item.FSRQ === targetDate);
+        if (found && found.DWJZ) {
+          const navNum = parseFloat(found.DWJZ);
+          if (!isNaN(navNum) && navNum > 0) return navNum;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // 尝试 2: 公开 CORS 代理兜底
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const res = await this._fetchWithTimeout(proxyUrl, 6000);
+      if (res && res.Data && Array.isArray(res.Data.LSJZList)) {
+        const found = res.Data.LSJZList.find(item => item.FSRQ === targetDate);
+        if (found && found.DWJZ) {
+          const navNum = parseFloat(found.DWJZ);
+          if (!isNaN(navNum) && navNum > 0) return navNum;
+        }
+      }
+    } catch (e) {
+      console.warn('[FundAPI] fetchHistoricalNav failed:', code, targetDate, e);
+    }
+
+    return null;
+  },
+
+  /**
    * 格式化 API 返回结果为以基金代码为 Key 的字典
    */
   _transformData(list) {

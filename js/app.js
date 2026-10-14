@@ -32,6 +32,7 @@
     btnToggleSignalAlert: document.getElementById('btnToggleSignalAlert'),
     signalBadgeText: document.getElementById('signalBadgeText'),
     signalAlertBanner: document.getElementById('signalAlertBanner'),
+    signalAlertItemsContainer: document.getElementById('signalAlertItemsContainer'),
     alertTitle: document.getElementById('alertTitle'),
     alertDesc: document.getElementById('alertDesc'),
     btnCopySignal: document.getElementById('btnCopySignal'),
@@ -51,7 +52,10 @@
     inputProfitAmount: document.getElementById('inputProfitAmount'),
     inputProfitRate: document.getElementById('inputProfitRate'),
     inputPlannedAmount: document.getElementById('inputPlannedAmount'),
-    selectAnchorMode: document.getElementById('selectAnchorMode'),
+    selectBuyAnchorMode: document.getElementById('selectBuyAnchorMode'),
+    inputBuyBenchmarkPrice: document.getElementById('inputBuyBenchmarkPrice'),
+    selectSellAnchorMode: document.getElementById('selectSellAnchorMode'),
+    inputSellBenchmarkPrice: document.getElementById('inputSellBenchmarkPrice'),
     inputCurrentNav: document.getElementById('inputCurrentNav'),
 
     // 加减仓弹窗
@@ -69,6 +73,12 @@
     tradeSellShares: document.getElementById('tradeSellShares'),
     maxSellSharesTip: document.getElementById('maxSellSharesTip'),
     tradeRemark: document.getElementById('tradeRemark'),
+    tradeNavRuleTip: document.getElementById('tradeNavRuleTip'),
+    tradeNavRuleText: document.getElementById('tradeNavRuleText'),
+    tradeDateTip: document.getElementById('tradeDateTip'),
+    tradePriceStatusBadge: document.getElementById('tradePriceStatusBadge'),
+    tradeAutoConfirmOption: document.getElementById('tradeAutoConfirmOption'),
+    chkAutoConfirmNav: document.getElementById('chkAutoConfirmNav'),
     btnSubmitTrade: document.getElementById('btnSubmitTrade'),
 
     // 策略参数配置弹窗
@@ -81,7 +91,10 @@
     cfgTiersList: document.getElementById('cfgTiersList'),
     cfgTotalRatioBadge: document.getElementById('cfgTotalRatioBadge'),
     cfgTierErrorMsg: document.getElementById('cfgTierErrorMsg'),
-    cfgAnchorMode: document.getElementById('cfgAnchorMode'),
+    cfgBuyAnchorMode: document.getElementById('cfgBuyAnchorMode'),
+    cfgBuyBenchmarkPrice: document.getElementById('cfgBuyBenchmarkPrice'),
+    cfgSellAnchorMode: document.getElementById('cfgSellAnchorMode'),
+    cfgSellBenchmarkPrice: document.getElementById('cfgSellBenchmarkPrice'),
     cfgPreviewTable: document.getElementById('cfgPreviewTable'),
 
     // 系统设置与备份弹窗
@@ -96,7 +109,13 @@
     btnTriggerImport: document.getElementById('btnTriggerImport'),
     fileImportJSON: document.getElementById('fileImportJSON'),
     btnLoadDemo: document.getElementById('btnLoadDemo'),
-    btnClearAll: document.getElementById('btnClearAll')
+    btnClearAll: document.getElementById('btnClearAll'),
+
+    // 基金历程时间轴弹窗
+    modalTimeline: document.getElementById('modalTimeline'),
+    timelineModalTitle: document.getElementById('timelineModalTitle'),
+    timelineModalSub: document.getElementById('timelineModalSub'),
+    timelineContainer: document.getElementById('timelineContainer')
   };
 
   /**
@@ -202,6 +221,9 @@
       setRefreshLoading(false);
     }
 
+    // 核心新增：自动检查并核准待确认的加减仓记录（收盘公布官方净值后自动校准真实份额与成本）
+    await checkAndConfirmPendingTrades();
+
     // 执行每只基金的策略分析
     currentAnalyses = currentFunds.map(fund => {
       const val = currentValuations[fund.code] || null;
@@ -212,6 +234,94 @@
     renderFundCards(currentAnalyses);
     checkSignalAlerts(currentAnalyses, isFrom1400);
     updateSnapshotPillUI();
+  }
+
+  /**
+   * 显示轻量浮动提示卡片
+   */
+  function showToast(message, duration = 4000) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'glass-panel';
+    toast.style.cssText = `
+      padding: 11px 16px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-primary);
+      border: 1px solid var(--border-glass-bright);
+      background: var(--bg-card);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      border-radius: var(--radius-md);
+      pointer-events: auto;
+      animation: fade-in 0.25s ease-out;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    `;
+    toast.innerHTML = `<span style="font-size: 16px; line-height: 1.3;">🔔</span><div style="flex: 1;">${message}</div>`;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-10px)';
+      setTimeout(() => toast.remove(), 350);
+    }, duration);
+  }
+
+  /**
+   * 自动巡检并核准待确认的交易记录 (T日15:00前申报按当日收盘公布官方净值结算，公布后自动校准真实份额与成本)
+   */
+  async function checkAndConfirmPendingTrades() {
+    let hasAnyConfirmed = false;
+    const confirmedNotices = [];
+
+    for (const fund of currentFunds) {
+      if (!Array.isArray(fund.trades) || fund.trades.length === 0) continue;
+      const val = currentValuations[fund.code];
+      let fundChanged = false;
+
+      for (const trade of fund.trades) {
+        if (trade.status !== 'pending' && !trade.isEstimated) continue;
+
+        const targetDate = trade.targetNavDate || trade.date;
+        let officialNav = null;
+
+        // 策略 1: 批量拉取的最新官方净值日期与目标交易日完全吻合（最常见场景：今晚公布或次日清晨拉取）
+        if (val && val.nav && Number(val.nav) > 0 && val.navDate === targetDate) {
+          officialNav = Number(val.nav);
+        } else if (val && val.navDate && val.navDate > targetDate) {
+          // 策略 2: 最新净值日期已超过该交易日（例如隔了几天未打开网页），拉取该日历史正式净值
+          try {
+            officialNav = await FundAPI.fetchHistoricalNav(fund.code, targetDate);
+          } catch (e) {
+            console.warn('[AutoConfirm] 历史净值获取失败:', fund.code, targetDate, e);
+          }
+        }
+
+        if (officialNav && officialNav > 0) {
+          FundStrategy.confirmTrade(fund, trade.id, officialNav);
+          fundChanged = true;
+          hasAnyConfirmed = true;
+          const typeName = trade.type === 'buy' ? '加仓' : '减仓';
+          confirmedNotices.push(`<strong>${fund.name}</strong> 的${typeName}已按 ${targetDate} 官方收盘净值 <strong>¥${officialNav.toFixed(4)}</strong> 完成校准确认！`);
+        }
+      }
+
+      if (fundChanged) {
+        FundStorage.updateFund(fund);
+      }
+    }
+
+    if (hasAnyConfirmed) {
+      loadFunds();
+      if (confirmedNotices.length > 0) {
+        showToast(`🎉 <strong>官方净值公布自动校准完成</strong><br>${confirmedNotices.join('<br>')}`, 6000);
+      }
+    }
   }
 
   /**
@@ -305,15 +415,23 @@
       const pnlRateText = (item.profitRate >= 0 ? '+' : '') + item.profitRate.toFixed(2) + '%';
       const pnlRateClass = item.profitRate >= 0 ? 'text-up' : 'text-down';
 
+      const todayStr = new Date().toISOString().split('T')[0];
+      const hasExecutedBuyToday = (fund.trades || []).some(t => t.date === todayStr && t.type === 'buy');
+      const hasExecutedSellToday = (fund.trades || []).some(t => t.date === todayStr && t.type === 'sell');
+
       // 下一步买点信息（份额保留2位小数）
       let nextBuyHtml = '';
       if (item.nextBuy) {
         const isTriggered = item.nextBuy.isTriggered;
         const buySharesFormatted = (Number(item.nextBuy.estShares) || 0).toFixed(2);
+        const buyPillClass = isTriggered ? (hasExecutedBuyToday ? 'buy-alert buy-executed' : 'buy-alert') : '';
+        const buyTitleText = isTriggered
+          ? (hasExecutedBuyToday ? '✅ 今日已执行加仓 (第' + item.nextBuy.level + '档)' : '🚨 已触及买点 (第' + item.nextBuy.level + '档)')
+          : '📉 下一买点 (第' + item.nextBuy.level + '档)';
         nextBuyHtml = `
-          <div class="action-pill ${isTriggered ? 'buy-alert' : ''}">
+          <div class="action-pill ${buyPillClass}">
             <div class="action-header">
-              <span style="color: var(--color-down)">${isTriggered ? '🚨 已触及买点 (第' + item.nextBuy.level + '档)' : '📉 下一买点 (第' + item.nextBuy.level + '档)'}</span>
+              <span style="color: var(--color-down)">${buyTitleText}</span>
               <span class="tabular-nums">${item.nextBuy.triggerPrice.toFixed(4)} (${item.nextBuy.distPercent.toFixed(1)}%)</span>
             </div>
             <div class="action-detail">
@@ -328,10 +446,14 @@
       if (item.nextSell) {
         const isTriggered = item.nextSell.isTriggered;
         const sellSharesFormatted = (Number(item.nextSell.shares) || 0).toFixed(2);
+        const sellPillClass = isTriggered ? (hasExecutedSellToday ? 'sell-alert sell-executed' : 'sell-alert') : '';
+        const sellTitleText = isTriggered
+          ? (hasExecutedSellToday ? '✅ 今日已执行减仓 (第' + item.nextSell.level + '档)' : '🚨 已触及卖点 (第' + item.nextSell.level + '档)')
+          : '📈 下一卖点 (第' + item.nextSell.level + '档)';
         nextSellHtml = `
-          <div class="action-pill ${isTriggered ? 'sell-alert' : ''}">
+          <div class="action-pill ${sellPillClass}">
             <div class="action-header">
-              <span style="color: var(--color-up)">${isTriggered ? '🚨 已触及卖点 (第' + item.nextSell.level + '档)' : '📈 下一卖点 (第' + item.nextSell.level + '档)'}</span>
+              <span style="color: var(--color-up)">${sellTitleText}</span>
               <span class="tabular-nums">${item.nextSell.triggerPrice.toFixed(4)} (${(item.nextSell.distPercent >= 0 ? '+' : '') + item.nextSell.distPercent.toFixed(1)}%)</span>
             </div>
             <div class="action-detail">
@@ -344,8 +466,6 @@
       // 渲染金字塔阶梯横向指示刻度
       const ladderTrackHtml = renderLadderTrack(item);
 
-      // 锚点说明与格式化
-      const anchorDesc = fund.anchorMode === 'avgCost' ? '持仓均价' : (fund.anchorMode === 'lastTrade' ? '最近成交价' : '初始建仓价');
       const sharesFormatted = (Number(item.shares) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const shortNavDate = item.navDate ? (item.navDate.length > 5 ? item.navDate.slice(5) : item.navDate) : '';
       const timeOnly = item.gzTime ? (item.gzTime.includes(' ') ? item.gzTime.split(' ')[1] : item.gzTime) : '';
@@ -359,7 +479,8 @@
             </div>
             <div class="fund-meta">
               <span class="fund-code">${item.code}</span>
-              <span>基准: ${anchorDesc} (¥${item.basePrice.toFixed(4)})</span>
+              <span>买基准: ¥${item.buyBasePrice.toFixed(4)} (${item.buyAnchorDesc})</span>
+              <span>卖基准: ¥${item.sellBasePrice.toFixed(4)} (${item.sellAnchorDesc})</span>
             </div>
           </div>
           <div class="fund-rate-group">
@@ -439,7 +560,10 @@
         <div class="ladder-section">
           <div class="ladder-header">
             <span>金字塔阶梯买卖决策 (每跌加仓 · 每涨减仓)</span>
-            <span class="anchor-tag">偏离基准：${(item.deviationFromBase >= 0 ? '+' : '') + item.deviationFromBase.toFixed(2)}%</span>
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <span class="anchor-tag" style="color: var(--color-down); border-color: var(--color-down-border);">买偏离：${(item.buyDeviation >= 0 ? '+' : '') + item.buyDeviation.toFixed(2)}%</span>
+              <span class="anchor-tag" style="color: var(--color-up); border-color: var(--color-up-border);">卖偏离：${(item.sellDeviation >= 0 ? '+' : '') + item.sellDeviation.toFixed(2)}%</span>
+            </div>
           </div>
 
           <div class="next-action-row">
@@ -457,11 +581,14 @@
           <button class="btn btn-sm" data-action="sell" data-fund-id="${item.fundId}">
             <span style="color: var(--color-up)">－</span> 记录减仓
           </button>
-          <button class="btn btn-sm" data-action="edit" data-fund-id="${item.fundId}">
-            ✏️ 修改持仓
+          <button class="btn btn-sm" data-action="timeline" data-fund-id="${item.fundId}" title="查看历程时间轴">
+            📅 时间轴
           </button>
           <button class="btn btn-sm" data-action="strategy" data-fund-id="${item.fundId}">
             ⚙️ 策略微调
+          </button>
+          <button class="btn btn-sm" data-action="edit" data-fund-id="${item.fundId}">
+            ✏️ 修改持仓
           </button>
           <button class="btn btn-sm" data-action="delete" data-fund-id="${item.fundId}" style="color: var(--text-muted)">
             删除
@@ -523,37 +650,118 @@
 
   /**
    * 检查买卖信号并触发告警横幅、音效与通知
+   * 1. 自动记录触发事件至 fund.alertHistory (避免重复刷屏)
+   * 2. 对已完成加减仓的信号显示为绿色背景“已成功执行加减仓”
+   * 3. 对未完成的信号显示对应【＋ 去加仓】/【－ 去减仓】快捷按钮
    */
   function checkSignalAlerts(analyses, isFrom1400 = false) {
     const triggeredList = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nowTime = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
     analyses.forEach(item => {
+      const fund = currentFunds.find(f => f.id === item.fundId);
+      if (!fund) return;
+      if (!Array.isArray(fund.alertHistory)) fund.alertHistory = [];
+
+      let fundUpdated = false;
+
       if (item.triggeredBuy) {
+        const todayBuy = (fund.trades || []).find(t => t.date === todayStr && t.type === 'buy');
+        const isExecuted = !!todayBuy;
+        const isPending = todayBuy ? (todayBuy.status === 'pending' || todayBuy.isEstimated) : false;
+        const alertKey = `${todayStr}_buy_${item.triggeredBuy.level}`;
+        const existingAlert = fund.alertHistory.find(a => a.key === alertKey);
+
+        if (!existingAlert) {
+          fund.alertHistory.push({
+            id: 'alert_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            key: alertKey,
+            type: 'buy_alert',
+            date: todayStr,
+            time: nowTime,
+            level: item.triggeredBuy.level,
+            triggerPrice: item.triggeredBuy.triggerPrice,
+            currentPrice: item.currentPrice,
+            amount: item.triggeredBuy.amount,
+            estShares: item.triggeredBuy.estShares,
+            timestamp: Date.now()
+          });
+          fundUpdated = true;
+        }
+
         triggeredList.push({
+          fundId: item.fundId,
           type: 'buy',
           name: item.name,
           code: item.code,
           level: item.triggeredBuy.level,
-          amount: item.triggeredBuy.amount
+          amount: item.triggeredBuy.amount,
+          estShares: item.triggeredBuy.estShares,
+          triggerPrice: item.triggeredBuy.triggerPrice,
+          currentPrice: item.currentPrice,
+          isExecuted: isExecuted,
+          isPending: isPending
         });
       }
+
       if (item.triggeredSell) {
+        const todaySell = (fund.trades || []).find(t => t.date === todayStr && t.type === 'sell');
+        const isExecuted = !!todaySell;
+        const isPending = todaySell ? (todaySell.status === 'pending' || todaySell.isEstimated) : false;
+        const alertKey = `${todayStr}_sell_${item.triggeredSell.level}`;
+        const existingAlert = fund.alertHistory.find(a => a.key === alertKey);
+
+        if (!existingAlert) {
+          fund.alertHistory.push({
+            id: 'alert_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            key: alertKey,
+            type: 'sell_alert',
+            date: todayStr,
+            time: nowTime,
+            level: item.triggeredSell.level,
+            triggerPrice: item.triggeredSell.triggerPrice,
+            currentPrice: item.currentPrice,
+            shares: item.triggeredSell.shares,
+            estAmount: item.triggeredSell.estAmount,
+            timestamp: Date.now()
+          });
+          fundUpdated = true;
+        }
+
         triggeredList.push({
+          fundId: item.fundId,
           type: 'sell',
           name: item.name,
           code: item.code,
           level: item.triggeredSell.level,
-          shares: item.triggeredSell.shares
+          shares: item.triggeredSell.shares,
+          estAmount: item.triggeredSell.estAmount,
+          triggerPrice: item.triggeredSell.triggerPrice,
+          currentPrice: item.currentPrice,
+          isExecuted: isExecuted,
+          isPending: isPending
         });
+      }
+
+      if (fundUpdated) {
+        FundStorage.updateFund(fund);
       }
     });
 
     if (triggeredList.length > 0) {
+      const unexecutedList = triggeredList.filter(t => !t.isExecuted);
+      const executedList = triggeredList.filter(t => t.isExecuted);
+
       // 顶部常驻快捷提醒按钮展示
       if (elements.btnToggleSignalAlert) {
         elements.btnToggleSignalAlert.style.display = 'inline-flex';
         if (elements.signalBadgeText) {
-          elements.signalBadgeText.textContent = `${triggeredList.length} 笔买卖提醒`;
+          if (unexecutedList.length > 0) {
+            elements.signalBadgeText.textContent = `${unexecutedList.length} 笔买卖待执行`;
+          } else {
+            elements.signalBadgeText.textContent = `今日买卖已全部执行 (${executedList.length})`;
+          }
         }
       }
 
@@ -567,25 +775,79 @@
       const buyCount = triggeredList.filter(t => t.type === 'buy').length;
       const sellCount = triggeredList.filter(t => t.type === 'sell').length;
 
-      let msg = `检测到 `;
-      if (buyCount > 0) msg += `${buyCount} 笔加仓信号 `;
-      if (sellCount > 0) msg += `${sellCount} 笔减仓信号`;
-      elements.alertTitle.textContent = `🚨 买卖点已触及（${msg}）`;
+      let msg = '';
+      if (buyCount > 0) msg += `${buyCount} 笔买点 `;
+      if (sellCount > 0) msg += `${sellCount} 笔卖点`;
 
-      const details = triggeredList.map(t => {
-        if (t.type === 'buy') {
-          return `${t.name}: 达买点第${t.level}档，建议买入 ¥${(Number(t.amount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        } else {
-          return `${t.name}: 达卖点第${t.level}档，建议减仓 ${(Number(t.shares) || 0).toFixed(2)} 份`;
-        }
-      }).join('；');
+      if (unexecutedList.length === 0) {
+        elements.alertTitle.textContent = `✅ 今日买卖触发点位（已全部执行加减仓）`;
+        elements.alertDesc.textContent = `检测到的 ${triggeredList.length} 笔策略触发点位今日均已成功执行记账`;
+      } else {
+        elements.alertTitle.textContent = `🚨 买卖点已触及（${msg.trim()}，待执行 ${unexecutedList.length} 笔）`;
+        elements.alertDesc.textContent = `盘中估值已触及金字塔策略设定的买入或卖出点位，可直接点击右侧按钮快捷记账：`;
+      }
 
-      elements.alertDesc.textContent = details;
+      // 渲染动态操作卡片
+      if (elements.signalAlertItemsContainer) {
+        let cardsHtml = '';
+        triggeredList.forEach(sig => {
+          const isExec = sig.isExecuted;
+          const isPending = sig.isPending;
+          const badgeClass = isExec ? 'badge-executed' : (sig.type === 'buy' ? 'badge-buy' : 'badge-sell');
+          let badgeText = '';
+          if (isExec) {
+            badgeText = isPending
+              ? `⏳ 已记录${sig.type === 'buy' ? '加仓' : '减仓'}申报 (待收盘官方净值校准)`
+              : `✅ 已成功执行${sig.type === 'buy' ? '加仓' : '减仓'}`;
+          } else {
+            badgeText = `🚨 达到${sig.type === 'buy' ? '加仓' : '减仓'}点 (第${sig.level}档)`;
+          }
 
-      // 如果是 14:00 定时抓取或检测到信号，触发声音与系统弹窗
-      if (isFrom1400) {
-        const hasBuy = buyCount > 0;
+          let detailText = '';
+          if (sig.type === 'buy') {
+            const buySharesStr = (Number(sig.estShares) || 0).toFixed(2);
+            detailText = `触发买入价: <strong class="tabular-nums">¥${sig.triggerPrice.toFixed(4)}</strong> · 建议加仓 <strong>¥${(Number(sig.amount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> (约 ${buySharesStr} 份)`;
+          } else {
+            const sellAmtStr = (Number(sig.estAmount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            detailText = `触发卖出价: <strong class="tabular-nums">¥${sig.triggerPrice.toFixed(4)}</strong> · 建议减仓 <strong>${(Number(sig.shares) || 0).toFixed(2)} 份</strong> (约 ¥${sellAmtStr})`;
+          }
+
+          let actionBtnHtml = '';
+          if (isExec) {
+            if (isPending) {
+              actionBtnHtml = `<span class="signal-executed-tag" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px dashed rgba(245, 158, 11, 0.4);">✓ 15:00前预估暂记 (待官方公布净值自动校准)</span>`;
+            } else {
+              actionBtnHtml = `<span class="signal-executed-tag">✓ 今日已成功执行加减仓</span>`;
+            }
+          } else {
+            actionBtnHtml = `<button class="btn btn-sm ${sig.type === 'buy' ? 'btn-action-buy' : 'btn-action-sell'}" data-action="quick-trade" data-fund-id="${sig.fundId}" data-trade-type="${sig.type}" data-amount="${sig.amount || ''}" data-shares="${sig.shares || ''}" data-price="${sig.triggerPrice}" data-level="${sig.level}">
+                 ${sig.type === 'buy' ? '＋ 去加仓' : '－ 去减仓'}
+               </button>`;
+          }
+
+          cardsHtml += `
+            <div class="signal-alert-card ${isExec ? 'executed' : ''}">
+              <div class="signal-alert-main">
+                <div class="signal-alert-title-row">
+                  <span class="signal-alert-badge ${badgeClass}">${badgeText}</span>
+                  <span class="signal-alert-fund-name">${sig.name} <span class="fund-code">${sig.code}</span></span>
+                </div>
+                <div class="signal-alert-detail">${detailText}</div>
+              </div>
+              <div class="signal-alert-action-box">
+                ${actionBtnHtml}
+              </div>
+            </div>
+          `;
+        });
+        elements.signalAlertItemsContainer.innerHTML = cardsHtml;
+      }
+
+      // 如果有未执行信号且是 14:00 定时抓取，触发声音与系统弹窗
+      if (isFrom1400 && unexecutedList.length > 0) {
+        const hasBuy = unexecutedList.some(t => t.type === 'buy');
         FundNotification.playChime(hasBuy ? 'buy' : 'sell');
+        const details = unexecutedList.map(t => `${t.name}: 第${t.level}档${t.type === 'buy' ? '加仓' : '减仓'}`).join('；');
         FundNotification.sendSystemNotification('【基金金字塔交易点位预警】', details);
       }
     } else {
@@ -685,7 +947,7 @@
       });
     });
 
-    // 持仓列表容器事件委托（处理加仓、减仓、修改、策略、删除）
+    // 持仓列表容器事件委托（处理加仓、减仓、时间轴、修改、策略、删除）
     elements.fundListContainer.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-action]');
       if (!btn) return;
@@ -697,6 +959,8 @@
         openTradeModal(fundId, 'buy');
       } else if (action === 'sell') {
         openTradeModal(fundId, 'sell');
+      } else if (action === 'timeline') {
+        openTimelineModal(fundId);
       } else if (action === 'edit') {
         openEditModal(fundId);
       } else if (action === 'strategy') {
@@ -705,6 +969,27 @@
         deleteFundConfirm(fundId);
       }
     });
+
+    // 告警横幅中快捷加减仓按钮点击处理
+    if (elements.signalAlertBanner) {
+      elements.signalAlertBanner.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action="quick-trade"]');
+        if (!btn) return;
+        const fundId = btn.getAttribute('data-fund-id');
+        const type = btn.getAttribute('data-trade-type');
+        const amount = btn.getAttribute('data-amount');
+        const shares = btn.getAttribute('data-shares');
+        const price = btn.getAttribute('data-price');
+        const level = btn.getAttribute('data-level');
+
+        openTradeModal(fundId, type, {
+          amount: amount ? parseFloat(amount) : '',
+          shares: shares ? parseFloat(shares) : '',
+          price: price ? parseFloat(price) : '',
+          remark: `触及第${level}档${type === 'buy' ? '加仓' : '减仓'}`
+        });
+      });
+    }
 
     // 添加基金：输入代码防抖自动联想
     let debounceTimer = null;
@@ -733,13 +1018,125 @@
       }
     });
 
-    elements.inputHoldingAmount.addEventListener('input', calcSharesFromAmount);
     function calcSharesFromAmount() {
       const nav = parseFloat(elements.inputCurrentNav.value) || 1.0;
       const amount = parseFloat(elements.inputHoldingAmount.value) || 0;
       if (amount > 0 && nav > 0 && !elements.inputHoldingShares.value) {
         elements.inputHoldingShares.placeholder = `约 ${(amount / nav).toFixed(2)} 份`;
       }
+    }
+
+    function updateAddModalBenchmarkDefaults(side = 'all') {
+      const nav = parseFloat(elements.inputCurrentNav.value) || 1.0;
+      const amount = parseFloat(elements.inputHoldingAmount.value) || 0;
+      const profit = parseFloat(elements.inputProfitAmount.value) || 0;
+      let shares = parseFloat(elements.inputHoldingShares.value);
+      if (isNaN(shares) || shares <= 0) {
+        shares = nav > 0 ? amount / nav : 0;
+      }
+      const cost = Math.max(0, amount - profit);
+      const unitCost = shares > 0 ? cost / shares : nav;
+
+      if (side === 'buy' || side === 'all') {
+        const mode = elements.selectBuyAnchorMode.value;
+        if (mode !== 'fixedCost') {
+          elements.inputBuyBenchmarkPrice.value = unitCost.toFixed(4);
+        }
+      }
+      if (side === 'sell' || side === 'all') {
+        const mode = elements.selectSellAnchorMode.value;
+        if (mode !== 'fixedCost') {
+          elements.inputSellBenchmarkPrice.value = unitCost.toFixed(4);
+        }
+      }
+    }
+
+    elements.inputHoldingAmount.addEventListener('input', () => {
+      calcSharesFromAmount();
+      updateAddModalBenchmarkDefaults('all');
+    });
+    elements.inputHoldingShares.addEventListener('input', () => {
+      updateAddModalBenchmarkDefaults('all');
+    });
+    elements.inputProfitAmount.addEventListener('input', () => {
+      updateAddModalBenchmarkDefaults('all');
+    });
+
+    if (elements.selectBuyAnchorMode) {
+      elements.selectBuyAnchorMode.addEventListener('change', () => {
+        updateAddModalBenchmarkDefaults('buy');
+      });
+    }
+    if (elements.inputBuyBenchmarkPrice) {
+      elements.inputBuyBenchmarkPrice.addEventListener('input', () => {
+        if (elements.selectBuyAnchorMode.value !== 'fixedCost') {
+          elements.selectBuyAnchorMode.value = 'fixedCost';
+        }
+      });
+    }
+
+    if (elements.selectSellAnchorMode) {
+      elements.selectSellAnchorMode.addEventListener('change', () => {
+        updateAddModalBenchmarkDefaults('sell');
+      });
+    }
+    if (elements.inputSellBenchmarkPrice) {
+      elements.inputSellBenchmarkPrice.addEventListener('input', () => {
+        if (elements.selectSellAnchorMode.value !== 'fixedCost') {
+          elements.selectSellAnchorMode.value = 'fixedCost';
+        }
+      });
+    }
+
+    // 策略微调弹窗买卖基准交互联动
+    if (elements.cfgBuyAnchorMode) {
+      elements.cfgBuyAnchorMode.addEventListener('change', () => {
+        const fund = currentFunds.find(f => f.id === elements.configFundId.value);
+        if (!fund) return;
+        const mode = elements.cfgBuyAnchorMode.value;
+        if (mode === 'initialCost') {
+          elements.cfgBuyBenchmarkPrice.value = (Number(fund.initialCost) || 1.0).toFixed(4);
+        } else if (mode === 'avgCost') {
+          elements.cfgBuyBenchmarkPrice.value = (Number(fund.avgCost) || Number(fund.initialCost) || 1.0).toFixed(4);
+        } else if (mode === 'lastTrade') {
+          elements.cfgBuyBenchmarkPrice.value = (Number(fund.lastTradePrice) || Number(fund.avgCost) || Number(fund.initialCost) || 1.0).toFixed(4);
+        }
+        updateStrategyModalPreview();
+      });
+    }
+
+    if (elements.cfgBuyBenchmarkPrice) {
+      elements.cfgBuyBenchmarkPrice.addEventListener('input', () => {
+        if (elements.cfgBuyAnchorMode.value !== 'fixedCost') {
+          elements.cfgBuyAnchorMode.value = 'fixedCost';
+        }
+        updateStrategyModalPreview();
+      });
+    }
+
+    if (elements.cfgSellAnchorMode) {
+      elements.cfgSellAnchorMode.addEventListener('change', () => {
+        const fund = currentFunds.find(f => f.id === elements.configFundId.value);
+        if (!fund) return;
+        const mode = elements.cfgSellAnchorMode.value;
+        if (mode === 'initialCost') {
+          elements.cfgSellBenchmarkPrice.value = (Number(fund.initialCost) || 1.0).toFixed(4);
+        } else if (mode === 'avgCost') {
+          elements.cfgSellBenchmarkPrice.value = (Number(fund.avgCost) || Number(fund.initialCost) || 1.0).toFixed(4);
+        } else if (mode === 'lastTrade') {
+          elements.cfgSellBenchmarkPrice.value = (Number(fund.lastTradePrice) || Number(fund.avgCost) || Number(fund.initialCost) || 1.0).toFixed(4);
+        }
+        updateStrategyModalPreview();
+      });
+    }
+
+    if (elements.cfgSellBenchmarkPrice) {
+      elements.cfgSellBenchmarkPrice.addEventListener('input', () => {
+        if (elements.cfgSellAnchorMode.value !== 'fixedCost') {
+          elements.cfgSellAnchorMode.value = 'fixedCost';
+        }
+        updateStrategyModalPreview();
+      });
     }
 
     // 保存持仓表单 (添加或修改)
@@ -749,6 +1146,12 @@
     });
 
     // 记账表单 (加仓/减仓)
+    if (elements.tradeDate) {
+      elements.tradeDate.addEventListener('change', () => {
+        updateTradeNoticeAndStatus();
+      });
+    }
+
     elements.formTrade.addEventListener('submit', (e) => {
       e.preventDefault();
       saveTradeRecord();
@@ -860,7 +1263,10 @@
     elements.modalAddFundTitle.textContent = '录入持仓基金';
     elements.fundQueryStatus.textContent = '输入后自动获取名称与净值';
     elements.inputCurrentNav.value = '1.0';
-    elements.selectAnchorMode.value = 'initialCost';
+    elements.selectBuyAnchorMode.value = 'initialCost';
+    elements.inputBuyBenchmarkPrice.value = '1.0000';
+    elements.selectSellAnchorMode.value = 'initialCost';
+    elements.inputSellBenchmarkPrice.value = '1.0000';
     elements.inputPlannedAmount.value = '15000';
     openModal(elements.modalAddFund);
     elements.inputFundCode.focus();
@@ -893,7 +1299,17 @@
     elements.inputProfitRate.value = profitRate.toFixed(2);
 
     elements.inputPlannedAmount.value = fund.plannedAmount || 15000;
-    elements.selectAnchorMode.value = fund.anchorMode || 'initialCost';
+
+    const buyMode = fund.buyAnchorMode || fund.anchorMode || 'initialCost';
+    elements.selectBuyAnchorMode.value = buyMode;
+    const defaultBuyPrice = (fund.buyBenchmarkPrice !== undefined && Number(fund.buyBenchmarkPrice) > 0) ? Number(fund.buyBenchmarkPrice) : (Number(fund.initialCost) || officialNav);
+    elements.inputBuyBenchmarkPrice.value = defaultBuyPrice.toFixed(4);
+
+    const sellMode = fund.sellAnchorMode || fund.anchorMode || 'initialCost';
+    elements.selectSellAnchorMode.value = sellMode;
+    const defaultSellPrice = (fund.sellBenchmarkPrice !== undefined && Number(fund.sellBenchmarkPrice) > 0) ? Number(fund.sellBenchmarkPrice) : (Number(fund.avgCost) || Number(fund.initialCost) || officialNav);
+    elements.inputSellBenchmarkPrice.value = defaultSellPrice.toFixed(4);
+
     elements.fundQueryStatus.textContent = `当前单位净值: ${officialNav} (原持仓成本价: ¥${(Number(fund.avgCost) || 0).toFixed(4)})`;
 
     openModal(elements.modalAddFund);
@@ -911,7 +1327,10 @@
     const profitAmount = elements.inputProfitAmount.value;
     const profitRate = elements.inputProfitRate.value;
     const plannedAmount = elements.inputPlannedAmount.value;
-    const anchorMode = elements.selectAnchorMode.value;
+    const buyAnchorMode = elements.selectBuyAnchorMode.value;
+    const buyBenchmarkPrice = parseFloat(elements.inputBuyBenchmarkPrice.value) || 0;
+    const sellAnchorMode = elements.selectSellAnchorMode.value;
+    const sellBenchmarkPrice = parseFloat(elements.inputSellBenchmarkPrice.value) || 0;
     const currentNav = elements.inputCurrentNav.value;
 
     if (isEdit) {
@@ -926,7 +1345,10 @@
           profitAmount: profitAmount,
           profitRate: profitRate,
           plannedAmount: plannedAmount,
-          anchorMode: anchorMode,
+          buyAnchorMode: buyAnchorMode,
+          buyBenchmarkPrice: buyBenchmarkPrice,
+          sellAnchorMode: sellAnchorMode,
+          sellBenchmarkPrice: sellBenchmarkPrice,
           currentNav: currentNav,
           stepPercent: fund.stepPercent,
           tiers: fund.tiers
@@ -936,7 +1358,11 @@
         fund.avgCost = updated.avgCost;
         fund.initialCost = updated.initialCost;
         fund.plannedAmount = updated.plannedAmount;
-        fund.anchorMode = updated.anchorMode;
+        fund.buyAnchorMode = buyAnchorMode;
+        fund.buyBenchmarkPrice = buyBenchmarkPrice || updated.initialCost;
+        fund.sellAnchorMode = sellAnchorMode;
+        fund.sellBenchmarkPrice = sellBenchmarkPrice || updated.avgCost;
+        fund.anchorMode = buyAnchorMode;
         FundStorage.updateFund(fund);
       }
     } else {
@@ -948,7 +1374,10 @@
         profitAmount: profitAmount,
         profitRate: profitRate,
         plannedAmount: plannedAmount,
-        anchorMode: anchorMode,
+        buyAnchorMode: buyAnchorMode,
+        buyBenchmarkPrice: buyBenchmarkPrice,
+        sellAnchorMode: sellAnchorMode,
+        sellBenchmarkPrice: sellBenchmarkPrice,
         currentNav: currentNav
       });
       FundStorage.addFund(fundObj);
@@ -962,9 +1391,166 @@
   }
 
   /**
-   * 打开加仓/减仓记账弹窗（完全安全，杜绝异常）
+   * 打开基金历程时间轴弹窗 (Timeline Modal)
+   * 纵向排列展示：添加基金日期、加减仓记录、提醒到达买卖点事件
+   * 最新时间点带有呼吸灯动效
    */
-  function openTradeModal(fundId, type = 'buy') {
+  function openTimelineModal(fundId) {
+    const fund = currentFunds.find(f => f.id === fundId);
+    if (!fund) {
+      console.warn('[openTimelineModal] 未找到基金:', fundId);
+      return;
+    }
+
+    if (elements.timelineModalTitle) {
+      elements.timelineModalTitle.textContent = `${fund.name} (${fund.code})`;
+    }
+    if (elements.timelineModalSub) {
+      elements.timelineModalSub.textContent = `初始建仓成本: ¥${(Number(fund.initialCost) || 0).toFixed(4)} · 当前持仓成本: ¥${(Number(fund.avgCost) || 0).toFixed(4)} · 累计交易: ${(fund.trades || []).length} 笔`;
+    }
+
+    const events = [];
+
+    // 1. 基金录入/初始建仓事件
+    const createdTime = fund.createdAt ? new Date(fund.createdAt).getTime() : 0;
+    const createdDateStr = fund.createdAt ? fund.createdAt.replace('T', ' ').slice(0, 16) : '初始录入';
+    events.push({
+      id: 'event_init',
+      type: 'init',
+      title: '录入/初始建仓',
+      timeStr: createdDateStr,
+      timestamp: createdTime || 1,
+      tagText: '🚀 初始建仓',
+      tagClass: 'tag-init',
+      dotClass: 'dot-init',
+      content: `初始总本金 <strong>¥${(Number(fund.totalCost) || 0).toFixed(2)}</strong>，持仓份额 ${(Number(fund.shares) || 0).toFixed(2)} 份，初始成本价 ¥${(Number(fund.initialCost) || 0).toFixed(4)}`,
+      subDetail: `买入基准方式: ${fund.buyAnchorMode === 'initialCost' ? '初始建仓价' : (fund.buyAnchorMode === 'avgCost' ? '当前持仓均价' : (fund.buyAnchorMode === 'lastTrade' ? '上次成交价' : '固定成本价'))} · 卖出基准方式: ${fund.sellAnchorMode === 'initialCost' ? '初始建仓价' : (fund.sellAnchorMode === 'avgCost' ? '当前持仓均价' : (fund.sellAnchorMode === 'lastTrade' ? '上次成交价' : '固定成本价'))}`
+    });
+
+    // 2. 加减仓记账事件 (来自 fund.trades)
+    (fund.trades || []).forEach((trade, idx) => {
+      if (trade.type === 'init') return; // 已在初始建仓中统一展示
+
+      const isBuy = trade.type === 'buy';
+      const isPending = trade.status === 'pending' || trade.isEstimated;
+      const tradeTimeStr = trade.date || '交易记录';
+      const tradeTs = trade.timestamp || (new Date(trade.date || fund.createdAt || 0).getTime() + idx * 1000);
+
+      let mainDesc = '';
+      let subDesc = '';
+      if (isBuy) {
+        if (isPending) {
+          mainDesc = `申购加仓金额 <strong>¥${(Number(trade.amount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>，暂按参考估值 ¥${(Number(trade.price) || 0).toFixed(4)} 预估 ${(Number(trade.shares) || 0).toFixed(2)} 份 <span style="display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; margin-left: 4px;">⏳ 待收盘公布官方净值后自动校准</span>`;
+        } else {
+          mainDesc = `申购加仓金额 <strong>¥${(Number(trade.amount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>，成交官方净值 ¥${(Number(trade.price) || 0).toFixed(4)}，确认份额 ${(Number(trade.shares) || 0).toFixed(2)} 份 <span style="display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; background: rgba(16, 185, 129, 0.15); color: var(--color-down); margin-left: 4px;">✅ 官方净值已确认</span>`;
+        }
+      } else {
+        if (isPending) {
+          mainDesc = `赎回减仓份额 <strong>${(Number(trade.shares) || 0).toFixed(2)} 份</strong>，暂按参考估值 ¥${(Number(trade.price) || 0).toFixed(4)} 预估赎回金额 ¥${(Number(trade.amount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style="display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; margin-left: 4px;">⏳ 待收盘公布官方净值后自动校准</span>`;
+        } else {
+          mainDesc = `赎回减仓份额 <strong>${(Number(trade.shares) || 0).toFixed(2)} 份</strong>，成交官方净值 ¥${(Number(trade.price) || 0).toFixed(4)}，赎回金额 ¥${(Number(trade.amount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style="display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; background: rgba(16, 185, 129, 0.15); color: var(--color-down); margin-left: 4px;">✅ 官方净值已确认</span>`;
+        }
+        if (trade.realizedProfit !== undefined) {
+          subDesc += `实现盈亏: ${trade.realizedProfit >= 0 ? '+' : ''}¥${trade.realizedProfit.toFixed(2)} · `;
+        }
+      }
+      if (trade.remark) {
+        subDesc += `备注: ${trade.remark}`;
+      }
+
+      let tagText = isBuy ? '➕ 加仓记账' : '➖ 减仓记账';
+      let tagClass = isBuy ? 'tag-buy' : 'tag-sell';
+      let dotClass = isBuy ? 'dot-buy' : 'dot-sell';
+      if (isPending) {
+        tagText = isBuy ? '⏳ 待确认加仓' : '⏳ 待确认减仓';
+        tagClass = 'tag-pending';
+        dotClass = 'dot-pending';
+      }
+
+      events.push({
+        id: trade.id || `trade_${idx}`,
+        type: isBuy ? 'buy' : 'sell',
+        title: isPending ? (isBuy ? '加仓申报 (待官方净值确认)' : '减仓申报 (待官方净值确认)') : (isBuy ? '加仓买入记账' : '减仓赎回记账'),
+        timeStr: tradeTimeStr,
+        timestamp: tradeTs,
+        tagText: tagText,
+        tagClass: tagClass,
+        dotClass: dotClass,
+        content: mainDesc,
+        subDetail: subDesc
+      });
+    });
+
+    // 3. 买卖点触发提醒事件 (来自 fund.alertHistory)
+    (fund.alertHistory || []).forEach((alert, idx) => {
+      const isBuy = alert.type === 'buy_alert';
+      const alertTimeStr = `${alert.date || ''} ${alert.time || ''}`.trim() || '点位提醒';
+      const alertTs = alert.timestamp || (new Date(alert.date || 0).getTime() + idx * 1000);
+
+      let mainDesc = '';
+      if (isBuy) {
+        mainDesc = `盘中参考估值达 <strong class="tabular-nums">¥${(Number(alert.currentPrice) || 0).toFixed(4)}</strong>，触及第 ${alert.level} 档买点 (触发价 ¥${(Number(alert.triggerPrice) || 0).toFixed(4)})，建议买入 <strong>¥${(Number(alert.amount) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> (约 ${(Number(alert.estShares) || 0).toFixed(2)} 份)`;
+      } else {
+        mainDesc = `盘中参考估值达 <strong class="tabular-nums">¥${(Number(alert.currentPrice) || 0).toFixed(4)}</strong>，触及第 ${alert.level} 档卖点 (触发价 ¥${(Number(alert.triggerPrice) || 0).toFixed(4)})，建议减仓 <strong>${(Number(alert.shares) || 0).toFixed(2)} 份</strong>`;
+      }
+
+      events.push({
+        id: alert.id || `alert_${idx}`,
+        type: alert.type,
+        title: isBuy ? `买点到达提醒 (第${alert.level}档)` : `卖点到达提醒 (第${alert.level}档)`,
+        timeStr: alertTimeStr,
+        timestamp: alertTs,
+        tagText: isBuy ? '🚨 买点到达' : '🚨 卖点到达',
+        tagClass: isBuy ? 'tag-buy_alert' : 'tag-sell_alert',
+        dotClass: isBuy ? 'dot-buy_alert' : 'dot-sell_alert',
+        content: mainDesc,
+        subDetail: '系统根据当前设定的金字塔阶梯策略自动监测判定'
+      });
+    });
+
+    // 按时间降序排序（最新时间点排在最顶端）
+    events.sort((a, b) => b.timestamp - a.timestamp);
+
+    if (elements.timelineContainer) {
+      if (events.length === 0) {
+        elements.timelineContainer.innerHTML = `
+          <div style="text-align: center; padding: 36px 12px; color: var(--text-muted); font-size: 13px;">
+            暂无历史事件记录
+          </div>
+        `;
+      } else {
+        let html = '<div class="timeline-track">';
+        events.forEach((ev, index) => {
+          const isLatest = index === 0;
+          html += `
+            <div class="timeline-item">
+              <div class="timeline-dot ${ev.dotClass} ${isLatest ? 'latest breathing-glow' : ''}" title="${isLatest ? '最新时间节点 (呼吸灯提示)' : ''}"></div>
+              <div class="timeline-card ${isLatest ? 'is-latest-card' : ''}">
+                <div class="timeline-header">
+                  <div class="timeline-badge-group">
+                    <span class="timeline-tag ${ev.tagClass}">${ev.tagText}</span>
+                    ${isLatest ? '<span class="timeline-latest-pill"><span class="pill-dot" style="width: 5px; height: 5px; background: #60a5fa; animation: pulse-dot 1s infinite;"></span> 最新事件</span>' : ''}
+                  </div>
+                  <span class="timeline-time tabular-nums">${ev.timeStr}</span>
+                </div>
+                <div class="timeline-body">${ev.content}</div>
+                ${ev.subDetail ? `<div class="timeline-sub-detail">${ev.subDetail}</div>` : ''}
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+        elements.timelineContainer.innerHTML = html;
+      }
+    }
+
+    openModal(elements.modalTimeline);
+  }
+
+  /**
+   * 打开加仓/减仓记账弹窗（完全安全，支持快捷带入推荐点位与规模，支持15:00未知价自动校准）
+   */
+  function openTradeModal(fundId, type = 'buy', prefillData = null) {
     const fund = currentFunds.find(f => f.id === fundId);
     if (!fund) {
       console.warn('[openTradeModal] 未找到基金:', fundId);
@@ -975,12 +1561,18 @@
     elements.tradeFundId.value = fundId;
     elements.tradeType.value = type;
     elements.tradeFundInfo.textContent = `${fund.name} (${fund.code})`;
-    elements.tradeDate.value = new Date().toISOString().split('T')[0];
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    elements.tradeDate.value = todayStr;
 
     const val = currentValuations[fund.code];
-    const priceCandidate = (val && val.currentPrice && !isNaN(val.currentPrice))
+    let priceCandidate = (val && val.currentPrice && !isNaN(val.currentPrice))
       ? Number(val.currentPrice)
       : (Number(fund.avgCost) || Number(fund.initialCost) || 1.0);
+    if (prefillData && prefillData.price) {
+      priceCandidate = Number(prefillData.price);
+    }
     elements.tradePrice.value = priceCandidate.toFixed(4);
 
     const currentShares = (typeof fund.shares === 'number' && !isNaN(fund.shares)) ? fund.shares : 0;
@@ -989,16 +1581,124 @@
       elements.modalTradeTitle.textContent = '记录加仓 (申购买入)';
       elements.tradeBuySection.style.display = 'block';
       elements.tradeSellSection.style.display = 'none';
-      elements.btnSubmitTrade.textContent = '确认加仓';
+      elements.btnSubmitTrade.textContent = '确认加仓记账';
+      if (prefillData && prefillData.amount) {
+        elements.tradeBuyAmount.value = Number(prefillData.amount).toFixed(2);
+      }
     } else {
       elements.modalTradeTitle.textContent = '记录减仓 (赎回卖出)';
       elements.tradeBuySection.style.display = 'none';
       elements.tradeSellSection.style.display = 'block';
       elements.maxSellSharesTip.textContent = `当前持仓: ${currentShares.toFixed(2)} 份`;
-      elements.btnSubmitTrade.textContent = '确认减仓';
+      elements.btnSubmitTrade.textContent = '确认减仓记账';
+      if (prefillData && prefillData.shares) {
+        elements.tradeSellShares.value = Number(prefillData.shares).toFixed(2);
+      }
     }
 
+    if (prefillData && prefillData.remark) {
+      elements.tradeRemark.value = prefillData.remark;
+    }
+
+    // 动态刷新 15:00 交易规则与官方净值公布状态提示
+    updateTradeNoticeAndStatus(fund);
+
     openModal(elements.modalTrade);
+  }
+
+  /**
+   * 动态更新加减仓弹窗的交易规则提示与净值状态
+   */
+  function updateTradeNoticeAndStatus(fund) {
+    if (!fund) {
+      fund = currentFunds.find(f => f.id === elements.tradeFundId.value);
+    }
+    if (!fund) return;
+
+    const tradeDate = elements.tradeDate.value;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const isToday = tradeDate === todayStr;
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const isBefore1500 = (currentHour < 15) || (currentHour === 15 && currentMinute === 0);
+
+    const val = currentValuations[fund.code];
+    const hasOfficialNavForDate = val && val.nav && Number(val.nav) > 0 && val.navDate === tradeDate;
+
+    if (hasOfficialNavForDate) {
+      if (elements.tradeNavRuleTip) {
+        elements.tradeNavRuleTip.style.background = 'rgba(16, 185, 129, 0.08)';
+        elements.tradeNavRuleTip.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+      }
+      if (elements.tradeNavRuleText) {
+        elements.tradeNavRuleText.innerHTML = `✅ <strong>官方净值已公布</strong>：${tradeDate} 官方收盘净值为 <strong>¥${Number(val.nav).toFixed(4)}</strong>，本次交易将直接以正式净值记账确认。`;
+      }
+      if (elements.tradePriceStatusBadge) {
+        elements.tradePriceStatusBadge.textContent = '（官方正式净值）';
+        elements.tradePriceStatusBadge.style.color = 'var(--color-down)';
+      }
+      if (elements.tradeAutoConfirmOption) {
+        elements.tradeAutoConfirmOption.style.display = 'none';
+      }
+      if (elements.chkAutoConfirmNav) {
+        elements.chkAutoConfirmNav.checked = false;
+      }
+      elements.tradePrice.value = Number(val.nav).toFixed(4);
+    } else if (isToday) {
+      if (isBefore1500) {
+        if (elements.tradeNavRuleTip) {
+          elements.tradeNavRuleTip.style.background = 'rgba(59, 130, 246, 0.08)';
+          elements.tradeNavRuleTip.style.borderColor = 'rgba(59, 130, 246, 0.25)';
+        }
+        if (elements.tradeNavRuleText) {
+          elements.tradeNavRuleText.innerHTML = `💡 <strong>公募基金未知价成交规则</strong>：在 <strong>15:00 前</strong> 执行的加减仓申报，成交价格为<strong>当天交易日收盘后公布的官方净值</strong>（通常当晚 20:00~22:00 公布）。系统当前以盘中参考估值暂记，待官方净值公布后（今晚或次日刷新拉取时）系统将<strong>自动校准确认</strong>真实净值与份额。`;
+        }
+        if (elements.tradePriceStatusBadge) {
+          elements.tradePriceStatusBadge.textContent = '（盘中参考估值 · 待收盘确认）';
+          elements.tradePriceStatusBadge.style.color = '#3b82f6';
+        }
+        if (elements.tradeAutoConfirmOption) {
+          elements.tradeAutoConfirmOption.style.display = 'block';
+        }
+        if (elements.chkAutoConfirmNav) {
+          elements.chkAutoConfirmNav.checked = true;
+        }
+      } else {
+        if (elements.tradeNavRuleTip) {
+          elements.tradeNavRuleTip.style.background = 'rgba(245, 158, 11, 0.1)';
+          elements.tradeNavRuleTip.style.borderColor = 'rgba(245, 158, 11, 0.25)';
+        }
+        if (elements.tradeNavRuleText) {
+          elements.tradeNavRuleText.innerHTML = `⚠️ <strong>盘后委托提醒</strong>：当前已超过 15:00，公募基金申报通常顺延至<strong>下一交易日 (T+1) 收盘官方净值</strong>成交。勾选自动校准后，系统将自动跟踪官方净值并核准确认。`;
+        }
+        if (elements.tradePriceStatusBadge) {
+          elements.tradePriceStatusBadge.textContent = '（盘后估值参考）';
+          elements.tradePriceStatusBadge.style.color = '#f59e0b';
+        }
+        if (elements.tradeAutoConfirmOption) {
+          elements.tradeAutoConfirmOption.style.display = 'block';
+        }
+        if (elements.chkAutoConfirmNav) {
+          elements.chkAutoConfirmNav.checked = true;
+        }
+      }
+    } else {
+      if (elements.tradeNavRuleTip) {
+        elements.tradeNavRuleTip.style.background = 'rgba(255, 255, 255, 0.04)';
+        elements.tradeNavRuleTip.style.borderColor = 'var(--border-glass)';
+      }
+      if (elements.tradeNavRuleText) {
+        elements.tradeNavRuleText.innerHTML = `ℹ️ 自定义日期交易：若已在交易软件中查到该笔实际成交净值，可直接填入；若开启自动校准，系统将尝试匹配官方历史净值确认。`;
+      }
+      if (elements.tradePriceStatusBadge) {
+        elements.tradePriceStatusBadge.textContent = '（参考输入）';
+        elements.tradePriceStatusBadge.style.color = 'var(--text-muted)';
+      }
+      if (elements.tradeAutoConfirmOption) {
+        elements.tradeAutoConfirmOption.style.display = 'block';
+      }
+    }
   }
 
   /**
@@ -1013,6 +1713,22 @@
     const date = elements.tradeDate.value;
     const price = parseFloat(elements.tradePrice.value) || fund.avgCost;
     const remark = elements.tradeRemark.value;
+    const autoConfirm = elements.chkAutoConfirmNav ? elements.chkAutoConfirmNav.checked : true;
+
+    // 检查当前交易日的官方净值是否已公布
+    const val = currentValuations[fund.code];
+    const isOfficialNavAvailable = val && val.nav && Number(val.nav) > 0 && val.navDate === date;
+
+    // 如果未公布官方净值且勾选了自动确认，则标记为待收盘官方净值确认 (pending)
+    const isPending = autoConfirm && !isOfficialNavAvailable;
+    const status = isPending ? 'pending' : 'confirmed';
+    const isEstimated = isPending;
+    const targetNavDate = date;
+
+    let tradeRemark = remark;
+    if (isPending) {
+      tradeRemark = tradeRemark ? `${tradeRemark} (15:00前预估暂记)` : '15:00前预估暂记，待收盘官方净值自动确认';
+    }
 
     if (type === 'buy') {
       const amount = parseFloat(elements.tradeBuyAmount.value) || 0;
@@ -1020,7 +1736,16 @@
         alert('请输入有效的买入金额！');
         return;
       }
-      FundStrategy.applyBuy(fund, { amount, price, date, remark });
+      FundStrategy.applyBuy(fund, {
+        amount,
+        price,
+        date,
+        status,
+        isEstimated,
+        autoConfirm,
+        targetNavDate,
+        remark: tradeRemark
+      });
     } else {
       const shares = parseFloat(elements.tradeSellShares.value) || 0;
       if (shares <= 0) {
@@ -1031,13 +1756,28 @@
         alert(`赎回份额 (${shares.toFixed(2)}) 超过了当前可用持仓 (${fund.shares.toFixed(2)})！`);
         return;
       }
-      FundStrategy.applySell(fund, { shares, price, date, remark });
+      FundStrategy.applySell(fund, {
+        shares,
+        price,
+        date,
+        status,
+        isEstimated,
+        autoConfirm,
+        targetNavDate,
+        remark: tradeRemark
+      });
     }
 
     FundStorage.updateFund(fund);
     loadFunds();
     closeModal(elements.modalTrade);
     refreshData(false);
+
+    if (isPending) {
+      showToast(`📝 <strong>加减仓已记录</strong><br>由于在 15:00 前执行，当前按盘中估值暂记；今日收盘公布官方净值后（今晚或次日刷新时）系统将<strong>自动校准确认</strong>真实份额！`, 5500);
+    } else {
+      showToast(`✅ <strong>记账成功</strong><br>已按成交净值 ¥${price.toFixed(4)} 确认交易！`, 3000);
+    }
   }
 
   /**
@@ -1050,7 +1790,16 @@
     elements.configFundId.value = fundId;
     elements.cfgStepPercent.value = fund.stepPercent || 5.0;
     elements.cfgPlannedAmount.value = fund.plannedAmount || 10000;
-    elements.cfgAnchorMode.value = fund.anchorMode || 'initialCost';
+
+    const buyMode = fund.buyAnchorMode || fund.anchorMode || 'initialCost';
+    elements.cfgBuyAnchorMode.value = buyMode;
+    const defaultBuyPrice = (fund.buyBenchmarkPrice !== undefined && Number(fund.buyBenchmarkPrice) > 0) ? Number(fund.buyBenchmarkPrice) : (Number(fund.initialCost) || 1.0);
+    elements.cfgBuyBenchmarkPrice.value = defaultBuyPrice.toFixed(4);
+
+    const sellMode = fund.sellAnchorMode || fund.anchorMode || 'initialCost';
+    elements.cfgSellAnchorMode.value = sellMode;
+    const defaultSellPrice = (fund.sellBenchmarkPrice !== undefined && Number(fund.sellBenchmarkPrice) > 0) ? Number(fund.sellBenchmarkPrice) : (Number(fund.avgCost) || Number(fund.initialCost) || 1.0);
+    elements.cfgSellBenchmarkPrice.value = defaultSellPrice.toFixed(4);
 
     // 深拷贝档位列表供动态编辑
     currentEditingTiers = JSON.parse(JSON.stringify(fund.tiers && fund.tiers.length > 0 ? fund.tiers : FundStrategy.DEFAULT_CONFIG.tiers));
@@ -1167,18 +1916,23 @@
   function updateStrategyModalPreview() {
     if (!elements.cfgPreviewTable) return;
     const step = parseFloat(elements.cfgStepPercent.value) || 5.0;
-    const budget = parseFloat(elements.cfgPlannedAmount.value) || 10000;
+    const buyPrice = parseFloat(elements.cfgBuyBenchmarkPrice.value) || 1.0;
+    const sellPrice = parseFloat(elements.cfgSellBenchmarkPrice.value) || 1.0;
 
     let rows = '';
     currentEditingTiers.forEach((tier, index) => {
       const p = (step * (index + 1)).toFixed(1);
-      const r = parseFloat(tier.buyRatio) || 0;
-      const buyAmt = Math.round(budget * (r / 100));
+      const buyTrigger = (buyPrice * (1 - p / 100)).toFixed(4);
+      const sellTrigger = (sellPrice * (1 + p / 100)).toFixed(4);
+      const isLast = index === currentEditingTiers.length - 1;
+      const borderStyle = isLast ? '' : 'border-bottom: 1px dashed var(--border-glass);';
 
       rows += `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.06);">
-          <span><strong>第 ${index + 1} 档：</strong>跌 <span style="color: var(--color-down)">-${p}%</span> (涨 <span style="color: var(--color-up)">+${p}%</span>)</span>
-          <span>买入 <strong style="color: var(--color-down)">${r}%</strong> (¥${buyAmt.toLocaleString()}) ｜ 卖出 <strong style="color: var(--color-up)">${r}%</strong></span>
+        <div style="display: flex; align-items: center; justify-content: flex-start; padding: 6px 0; ${borderStyle} font-size: 12px; gap: 4px; flex-wrap: wrap;">
+          <strong style="color: var(--text-primary); min-width: 48px;">第 ${index + 1} 档：</strong>
+          <span style="white-space: nowrap;">跌 <span style="color: var(--color-down); font-weight: 600;">-${p}%</span> (买价 <span class="tabular-nums" style="color: var(--color-down); font-weight: 600;">¥${buyTrigger}</span>)</span>
+          <span style="color: var(--text-muted); opacity: 0.5; margin: 0 4px;">｜</span>
+          <span style="white-space: nowrap;">涨 <span style="color: var(--color-up); font-weight: 600;">+${p}%</span> (卖价 <span class="tabular-nums" style="color: var(--color-up); font-weight: 600;">¥${sellTrigger}</span>)</span>
         </div>
       `;
     });
@@ -1204,11 +1958,18 @@
 
     const step = parseFloat(elements.cfgStepPercent.value) || 5.0;
     const planned = parseFloat(elements.cfgPlannedAmount.value) || 10000;
-    const anchor = elements.cfgAnchorMode.value;
+    const buyAnchorMode = elements.cfgBuyAnchorMode.value;
+    const buyBenchmarkPrice = parseFloat(elements.cfgBuyBenchmarkPrice.value) || fund.initialCost;
+    const sellAnchorMode = elements.cfgSellAnchorMode.value;
+    const sellBenchmarkPrice = parseFloat(elements.cfgSellBenchmarkPrice.value) || fund.avgCost || fund.initialCost;
 
     fund.stepPercent = step;
     fund.plannedAmount = planned;
-    fund.anchorMode = anchor;
+    fund.buyAnchorMode = buyAnchorMode;
+    fund.buyBenchmarkPrice = buyBenchmarkPrice;
+    fund.sellAnchorMode = sellAnchorMode;
+    fund.sellBenchmarkPrice = sellBenchmarkPrice;
+    fund.anchorMode = buyAnchorMode; // 兼容
     fund.tiers = currentEditingTiers.map((t, idx) => ({
       step: idx + 1,
       percent: step * (idx + 1),
@@ -1249,6 +2010,7 @@
     openEditModal,
     openTradeModal,
     openStrategyModal,
+    openTimelineModal,
     deleteFundConfirm,
     loadDemoData
   };
