@@ -13,6 +13,8 @@
   let currentSettings = {};
   let currentEditingTiers = []; // 策略弹窗正在编辑的动态档位数组
   let isAlertBannerHiddenByUser = false; // 用户是否点击了“收起”
+  let isLinking = false; // 防持仓字段联动循环触发
+  let lastProfitField = 'amount'; // 记录最近编辑收益项：'amount' | 'rate'
 
   // DOM 元素引用
   const elements = {
@@ -1018,9 +1020,6 @@
         elements.fundQueryStatus.textContent = '输入后自动获取名称与净值';
       }
     });
-
-    let isLinking = false;
-    let lastProfitField = 'amount'; // 'amount' | 'rate'
 
     // 根据持仓金额计算并同步持仓份额
     function syncFromHoldingAmount() {
