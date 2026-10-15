@@ -231,6 +231,18 @@
   border-color: #e2e8f0;
 }
 
+[data-theme="light"] .cfg-preview-table,
+[data-theme="light"] #cfgPreviewTable {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .cfg-tier-row {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
 [data-theme="light"] .modal-footer {
   border-top-color: #e2e8f0;
 }
@@ -1551,6 +1563,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .form-row > * {
   min-width: 0;
   max-width: 100%;
+}
+
+/* 策略设置弹窗：档位行与实时联动预览表格 */
+.cfg-tier-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-glass);
+}
+
+.cfg-preview-table {
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  border: 1px solid var(--border-glass);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .modal-footer {

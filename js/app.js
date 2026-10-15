@@ -2393,7 +2393,7 @@
       const triggerPct = (step * (index + 1)).toFixed(1);
 
       const row = document.createElement('div');
-      row.style.cssText = 'display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass);';
+      row.className = 'cfg-tier-row';
       row.innerHTML = `
         <div style="font-size: 12px; font-weight: 700; min-width: 52px;">第 ${index + 1} 档</div>
         <div style="font-size: 11px; color: var(--text-muted); min-width: 96px;">跌 -${triggerPct}% / 涨 +${triggerPct}%</div>
